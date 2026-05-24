@@ -1,7 +1,6 @@
 import calendar
 import datetime
 import io
-import json
 import os
 import smtplib
 import ssl
@@ -969,149 +968,6 @@ def enviar_email(destinatario, assunto, mensagem_html, mensagem_texto=None):
         server.ehlo()
         server.login(SMTP_USER, SMTP_PASS)
         server.sendmail(SMTP_USER, [destinatario], msg.as_string())
-
-
-# ===========================================
-# BOTBOT — WhatsApp / Telegram
-# ===========================================
-# Segurança: não deixe appKey/authKey hardcoded no app.py.
-# Configure estas variáveis no Render ou no .env local:
-#   BOTBOT_APP_KEY
-#   BOTBOT_AUTH_KEY
-#   BOTBOT_SEND_TEXT_URL=https://botbot.chat/api/v2/sendText
-#   BOTBOT_ENABLED=true
-BOTBOT_SEND_TEXT_URL = os.getenv(
-    "BOTBOT_SEND_TEXT_URL",
-    "https://botbot.chat/api/v2/sendText",
-).strip()
-BOTBOT_APP_KEY = os.getenv("BOTBOT_APP_KEY", "").strip()
-BOTBOT_AUTH_KEY = os.getenv("BOTBOT_AUTH_KEY", "").strip()
-BOTBOT_ENABLED = _is_truthy(os.getenv("BOTBOT_ENABLED", "true"))
-
-
-def normalizar_celular_botbot(celular):
-    """
-    Converte números cadastrados no perfil para o formato aceito pelo BotBot/WhatsApp:
-    5513999999999.
-
-    Aceita exemplos como:
-      - (13) 99999-9999
-      - 13 99999-9999
-      - 5513999999999
-    """
-    numero = re.sub(r"\D+", "", str(celular or ""))
-
-    if not numero:
-        return None
-
-    # Remove zeros à esquerda, caso o cadastro venha como 013...
-    numero = numero.lstrip("0")
-
-    # Já veio com DDI do Brasil.
-    if numero.startswith("55") and len(numero) in (12, 13):
-        return numero
-
-    # Veio como DDD + telefone.
-    if len(numero) in (10, 11):
-        return "55" + numero
-
-    current_app.logger.warning("BotBot: celular em formato inválido: %s", celular)
-    return None
-
-
-def enviar_botbot_texto(usuario, mensagem):
-    """
-    Envia uma mensagem de texto via BotBot.
-
-    Importante:
-      - Nunca derruba o fluxo principal do sistema.
-      - Se falhar, apenas registra log e retorna False.
-      - Usa o campo User.celular como destinatário.
-    """
-    if not BOTBOT_ENABLED:
-        return False
-
-    telefone = normalizar_celular_botbot(getattr(usuario, "celular", None))
-    if not telefone:
-        current_app.logger.warning(
-            "BotBot não enviado: usuário %s sem celular válido.",
-            getattr(usuario, "id", None),
-        )
-        return False
-
-    if not BOTBOT_APP_KEY or not BOTBOT_AUTH_KEY:
-        current_app.logger.warning(
-            "BotBot não enviado: configure BOTBOT_APP_KEY e BOTBOT_AUTH_KEY."
-        )
-        return False
-
-    texto = str(mensagem or "").strip()
-    if not texto:
-        current_app.logger.warning("BotBot não enviado: mensagem vazia.")
-        return False
-
-    payload = {
-        "to": telefone,
-        "typingDelay": 1,
-        "queue": True,
-        "delay": 0,
-        "message": texto[:3500],
-    }
-
-    req_body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-
-    try:
-        from urllib.error import HTTPError, URLError
-        from urllib.request import Request, urlopen
-
-        req = Request(
-            BOTBOT_SEND_TEXT_URL,
-            data=req_body,
-            method="POST",
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-                "appKey": BOTBOT_APP_KEY,
-                "authKey": BOTBOT_AUTH_KEY,
-            },
-        )
-
-        with urlopen(req, timeout=15) as resp:
-            status = getattr(resp, "status", 200)
-            body = resp.read().decode("utf-8", errors="replace")
-
-        if status >= 400:
-            current_app.logger.warning(
-                "BotBot falhou status=%s body=%s",
-                status,
-                body[:500],
-            )
-            return False
-
-        current_app.logger.info(
-            "BotBot enviado com sucesso para usuário_id=%s telefone=%s",
-            getattr(usuario, "id", None),
-            telefone,
-        )
-        return True
-
-    except HTTPError as e:
-        try:
-            body = e.read().decode("utf-8", errors="replace")
-        except Exception:
-            body = ""
-        current_app.logger.warning(
-            "BotBot HTTPError status=%s body=%s",
-            getattr(e, "code", None),
-            body[:500],
-        )
-        return False
-    except URLError as e:
-        current_app.logger.warning("BotBot URLError: %s", e)
-        return False
-    except Exception:
-        current_app.logger.exception("Erro inesperado ao enviar BotBot.")
-        return False
 
 
 # ===== Helpers de TERMO =====
@@ -3468,42 +3324,6 @@ def admin_agendar_para():
                     "warning",
                 )
 
-            # =========================
-            # BOTBOT/WhatsApp para o USUÁRIO ALVO
-            # =========================
-            try:
-                mensagem_botbot = (
-                    f"📅 *Agendamento registrado no sistema*\n\n"
-                    f"Olá, {nome}.\n\n"
-                    f"A administração da unidade registrou um agendamento em seu nome.\n\n"
-                    f"📌 *Tipo:* {descricao_motivo}\n"
-                    f"📅 *Data/Período:* {data_str}\n"
-                    f"✅ *Status:* {status_label}\n"
-                    f"🧾 *Protocolo:* #{primeiro.id}\n"
-                    f"👤 *Registrado por:* {admin_nome}\n"
-                )
-
-                if tipo_folga == "BH":
-                    mensagem_botbot += f"⏱️ *Tempo lançado:* {tempo_bh}\n"
-                    if data_ref_str:
-                        mensagem_botbot += f"📆 *Data de referência:* {data_ref_str}\n"
-
-                if nome_substituto:
-                    mensagem_botbot += f"👥 *Substituto:* {nome_substituto}\n"
-
-                mensagem_botbot += (
-                    f"\nA informação já consta no Portal do Servidor.\n\n"
-                    f"_Mensagem automática da E.M. José Padin Mouta._"
-                )
-
-                enviar_botbot_texto(usuario_alvo, mensagem_botbot)
-
-            except Exception:
-                current_app.logger.exception(
-                    "Falha ao preparar/enviar BotBot do agendamento criado pelo admin %s",
-                    getattr(primeiro, "id", None),
-                )
-
             return redirect(url_for("admin_agendar_para"))
 
         except Exception as e:
@@ -4979,60 +4799,6 @@ def deferir_folgas():
                     "warning",
                 )
 
-            # =========================
-            # BOTBOT/WhatsApp para decisão de agendamento
-            # =========================
-            try:
-                if novo_status == "deferido":
-                    titulo_botbot = "✅ *Solicitação deferida*"
-                    texto_principal = "Sua solicitação foi analisada e *deferida* pela administração da unidade."
-                    status_emoji = "✅"
-                    orientacao_final = "A informação já consta no Portal do Servidor."
-                else:
-                    titulo_botbot = "❌ *Solicitação indeferida*"
-                    texto_principal = "Sua solicitação foi analisada e, no momento, foi *indeferida* pela administração da unidade."
-                    status_emoji = "❌"
-                    orientacao_final = (
-                        "Para mais informações, consulte a administração da unidade."
-                    )
-
-                mensagem_botbot = (
-                    f"{titulo_botbot}\n\n"
-                    f"Olá, {usuario.nome}.\n\n"
-                    f"{texto_principal}\n\n"
-                    f"📌 *Tipo:* {descricao_motivo}\n"
-                    f"📅 *Data/Período:* {periodo_str}\n"
-                    f"{status_emoji} *Status:* {decisao}\n"
-                    f"🧾 *Protocolo:* #{folga_principal.id}\n"
-                )
-
-                if folga_principal.motivo == "BH":
-                    mensagem_botbot += f"⏱️ *Tempo utilizado:* {tempo_bh}\n"
-                    if data_ref_str:
-                        mensagem_botbot += f"📆 *Data de referência:* {data_ref_str}\n"
-
-                if nome_substituto:
-                    mensagem_botbot += f"👥 *Substituto:* {nome_substituto}\n"
-
-                if folga_principal.motivo == "LM":
-                    mensagem_botbot += (
-                        "\nℹ️ *Observação:* a escola registra ciência administrativa da Licença Médica. "
-                        "A concessão/homologação depende do órgão central.\n"
-                    )
-
-                mensagem_botbot += (
-                    f"\n{orientacao_final}\n\n"
-                    f"_Mensagem automática da E.M. José Padin Mouta._"
-                )
-
-                enviar_botbot_texto(usuario, mensagem_botbot)
-
-            except Exception:
-                current_app.logger.exception(
-                    "Falha ao preparar/enviar BotBot da decisão do agendamento %s",
-                    folga_principal.id,
-                )
-
         except Exception as e:
             db.session.rollback()
             flash(f"Erro ao atualizar folga: {str(e)}", "danger")
@@ -6074,48 +5840,6 @@ def deferir_horas():
                     flash(
                         "Status atualizado, mas não foi possível enviar o e-mail de notificação neste momento.",
                         "warning",
-                    )
-
-                # =========================
-                # BOTBOT/WhatsApp para decisão de Banco de Horas
-                # =========================
-                try:
-                    decisao_upper = (decisao or "").strip().upper()
-
-                    if decisao_upper.startswith("INDEFER"):
-                        titulo_botbot = "❌ *Banco de Horas indeferido*"
-                        texto_principal = "Seu lançamento de Banco de Horas foi analisado e, no momento, foi *indeferido* pela administração da unidade."
-                        status_emoji = "❌"
-                        orientacao_final = "Para mais informações, consulte a administração da unidade."
-                    else:
-                        titulo_botbot = "✅ *Banco de Horas deferido*"
-                        texto_principal = "Seu lançamento de Banco de Horas foi analisado e *deferido* pela administração da unidade."
-                        status_emoji = "✅"
-                        orientacao_final = (
-                            "O saldo atualizado já consta no Portal do Servidor."
-                        )
-
-                    mensagem_botbot = (
-                        f"{titulo_botbot}\n\n"
-                        f"Olá, {funcionario.nome}.\n\n"
-                        f"{texto_principal}\n\n"
-                        f"📅 *Data de realização:* {data_str}\n"
-                        f"⏱️ *Quantidade:* {qtd_str}\n"
-                        f"{status_emoji} *Status:* {decisao_upper}\n"
-                        f"🧾 *Protocolo:* #{protocolo}\n\n"
-                        f"📊 *Resumo do Banco de Horas*\n"
-                        f"• *Saldo atual:* {_format_hm_from_minutes(saldo_atual_min)}\n"
-                        f"• *Em espera:* {_format_hm_from_minutes(pendentes_min)} em {pendentes_qtd} lançamento(s)\n\n"
-                        f"{orientacao_final}\n\n"
-                        f"_Mensagem automática da E.M. José Padin Mouta._"
-                    )
-
-                    enviar_botbot_texto(funcionario, mensagem_botbot)
-
-                except Exception:
-                    current_app.logger.exception(
-                        "Falha ao preparar/enviar BotBot de decisão do BH (registro %s)",
-                        banco_horas.id,
                     )
 
             except Exception:
@@ -8132,40 +7856,6 @@ def admin_tre_decidir(tre_id: int):
 
         db.session.commit()
         sync_tre_user(user.id)
-
-        # =========================
-        # BOTBOT/WhatsApp para TRE deferida
-        # =========================
-        try:
-            admin_nome = (current_user.nome or "").strip() or "Administração"
-
-            mensagem_botbot = (
-                f"✅ *TRE deferida*\n\n"
-                f"Olá, {user.nome}.\n\n"
-                f"Sua TRE foi analisada e *deferida* pela administração da unidade.\n\n"
-                f"📄 *Tipo:* TRE\n"
-                f"📅 *Dias validados:* {dias_aprovados} dia(s)\n"
-                f"✅ *Status:* DEFERIDA\n"
-                f"🧾 *Protocolo TRE:* #{tre.id}\n"
-                f"👤 *Analisado por:* {admin_nome}\n"
-            )
-
-            if parecer:
-                mensagem_botbot += f"📝 *Parecer:* {parecer}\n"
-
-            mensagem_botbot += (
-                f"\nA informação já consta no Portal do Servidor.\n\n"
-                f"_Mensagem automática da E.M. José Padin Mouta._"
-            )
-
-            enviar_botbot_texto(user, mensagem_botbot)
-
-        except Exception:
-            current_app.logger.exception(
-                "Falha ao preparar/enviar BotBot de deferimento da TRE %s",
-                tre.id,
-            )
-
         return jsonify(
             {"success": True, "message": f"TRE deferida (+{dias_aprovados} dia(s))."}
         )
@@ -8180,39 +7870,6 @@ def admin_tre_decidir(tre_id: int):
 
     db.session.commit()
     sync_tre_user(user.id)
-
-    # =========================
-    # BOTBOT/WhatsApp para TRE indeferida
-    # =========================
-    try:
-        admin_nome = (current_user.nome or "").strip() or "Administração"
-
-        mensagem_botbot = (
-            f"❌ *TRE indeferida*\n\n"
-            f"Olá, {user.nome}.\n\n"
-            f"Sua TRE foi analisada e, no momento, foi *indeferida* pela administração da unidade.\n\n"
-            f"📄 *Tipo:* TRE\n"
-            f"❌ *Status:* INDEFERIDA\n"
-            f"🧾 *Protocolo TRE:* #{tre.id}\n"
-            f"👤 *Analisado por:* {admin_nome}\n"
-        )
-
-        if parecer:
-            mensagem_botbot += f"📝 *Parecer:* {parecer}\n"
-
-        mensagem_botbot += (
-            f"\nPara mais informações, consulte a administração da unidade.\n\n"
-            f"_Mensagem automática da E.M. José Padin Mouta._"
-        )
-
-        enviar_botbot_texto(user, mensagem_botbot)
-
-    except Exception:
-        current_app.logger.exception(
-            "Falha ao preparar/enviar BotBot de indeferimento da TRE %s",
-            tre.id,
-        )
-
     return jsonify({"success": True, "message": "TRE indeferida."})
 
 
@@ -9551,7 +9208,8 @@ def _get_eventos_nao_vistos(user_id: int, limit: int = 5):
     que ainda não foram vistos pelo usuário (sem registro em evento_visto).
     Não exige Model SQLAlchemy de evento_visto (usa SQL direto).
     """
-    sql = text("""
+    sql = text(
+        """
         SELECT
             e.id,
             e.nome,
@@ -9573,7 +9231,8 @@ def _get_eventos_nao_vistos(user_id: int, limit: int = 5):
           )
         ORDER BY e.criado_em DESC, e.data_evento DESC
         LIMIT :lim
-    """)
+    """
+    )
     return db.session.execute(sql, {"uid": user_id, "lim": limit}).mappings().all()
 
 
@@ -9584,11 +9243,13 @@ def _marcar_eventos_como_vistos(user_id: int, evento_ids):
     if not evento_ids:
         return
 
-    sql = text("""
+    sql = text(
+        """
         INSERT INTO evento_visto (user_id, evento_id, visto_em)
         VALUES (:uid, :eid, timezone('utc', now()))
         ON CONFLICT (user_id, evento_id) DO NOTHING
-    """)
+    """
+    )
     for eid in evento_ids:
         db.session.execute(sql, {"uid": user_id, "eid": int(eid)})
 
