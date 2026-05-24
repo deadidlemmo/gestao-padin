@@ -67,7 +67,7 @@
   }
 
   /* Garantia contra corte por overflow no header */
-  .header-mobile, .header-bottom{ overflow: visible !important; }
+  .header-desktop, .header-mobile, .header-bottom{ overflow: visible !important; }
 
   .gp-notify{
     --gp-brand: var(--brand, #007bff);
@@ -98,6 +98,14 @@
       right: auto !important;
       transform: none !important;
       z-index: auto !important;
+    }
+
+    .gp-notify.gp-notify--desktop-docked{
+      position: absolute !important;
+      top: 50% !important;
+      right: 92px !important;
+      transform: translateY(-50%) !important;
+      z-index: 30 !important;
     }
   }
 
@@ -297,17 +305,23 @@
 
   if(!root || !btn || !menu) return;
 
+  function clearMenuPosition(){
+    menu.style.position = '';
+    menu.style.left = '';
+    menu.style.top = '';
+    menu.style.right = '';
+    menu.style.bottom = '';
+    menu.style.zIndex = '';
+  }
+
   function positionMenuFixed(){
     // Só usa posição fixed quando estiver dockado no header-bottom (mobile)
-    const docked = root.classList.contains('gp-notify--docked');
+    const mobileDocked = root.classList.contains('gp-notify--docked');
+    const desktopDocked = root.classList.contains('gp-notify--desktop-docked');
     const inHeaderActions = !!root.closest('.header-actions');
-    if(!docked || inHeaderActions){
+    if(!mobileDocked || inHeaderActions || desktopDocked){
       // limpa estilos inline para voltar ao CSS padrão (absolute)
-      menu.style.position = '';
-      menu.style.left = '';
-      menu.style.top = '';
-      menu.style.right = '';
-      menu.style.bottom = '';
+      clearMenuPosition();
       return;
     }
 
@@ -378,24 +392,47 @@
   const originalParent = root.parentNode;
   const originalNext = root.nextSibling;
 
+  function restoreOriginalPosition(){
+    if(!originalParent) return;
+
+    if(originalNext && originalNext.parentNode === originalParent){
+      originalParent.insertBefore(root, originalNext);
+    }else if(root.parentNode !== originalParent){
+      originalParent.appendChild(root);
+    }
+  }
+
   function dock(){
     const headerBottom = document.querySelector('.header-bottom');
     const homeBtn = headerBottom?.querySelector('.btn-home-mobile');
+    const headerDesktop = document.querySelector('.header-desktop');
+    const desktopHomeBtn = headerDesktop?.querySelector('.btn-home');
 
     if(mq.matches && headerBottom && homeBtn){
       headerBottom.insertBefore(root, homeBtn);
       root.classList.add('gp-notify--docked');
+      root.classList.remove('gp-notify--desktop-docked');
       // garante que o dropdown não herde alinhamento do header
       headerBottom.style.overflow = 'visible';
     }else{
-      if(originalParent){
-        if(originalNext){
-          originalParent.insertBefore(root, originalNext);
+      const originalWasHeaderActions = !!originalParent?.classList?.contains('header-actions');
+
+      if(originalWasHeaderActions){
+        restoreOriginalPosition();
+        root.classList.remove('gp-notify--docked', 'gp-notify--desktop-docked');
+      }else if(headerDesktop){
+        if(desktopHomeBtn){
+          headerDesktop.insertBefore(root, desktopHomeBtn);
         }else{
-          originalParent.appendChild(root);
+          headerDesktop.appendChild(root);
         }
+        root.classList.remove('gp-notify--docked');
+        root.classList.add('gp-notify--desktop-docked');
+        headerDesktop.style.overflow = 'visible';
+      }else{
+        restoreOriginalPosition();
+        root.classList.remove('gp-notify--docked', 'gp-notify--desktop-docked');
       }
-      root.classList.remove('gp-notify--docked');
       // volta ao comportamento padrão de posicionamento
       positionMenuFixed();
     }
