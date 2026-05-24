@@ -1,16 +1,8 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Inserir TRE (Admin)</title>
+{% extends "base.html" %}
 
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=3, minimum-scale=1" />
-  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% block title %}Inserir TRE (Admin){% endblock %}
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet" />
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap" rel="stylesheet" />
-
+{% block styles %}
   <style>
     :root {
       --primary: #0077ff;
@@ -575,47 +567,12 @@
     }
 
     .is-hidden{ display:none !important; }
-  </style>
-</head>
+    </style>
+{% endblock %}
 
-<body>
-  <!-- Cabeçalho Desktop -->
-  <header class="header-desktop">
-    <div class="left-section">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo" />
-      <div class="text-container">
-        <div class="escola-nome">Escola Municipal</div>
-        <div class="escola-subtitulo">José Padin Mouta</div>
-      </div>
-    </div>
-    <div class="header-center-text-container">
-      <div class="header-center-text">CENTRAL DA UNIDADE</div>
-    </div>
-    <a href="{{ url_for('index') }}" class="btn-home" title="Página Inicial">
-      <i class="fas fa-home"></i>
-    </a>
-  </header>
+{% block flash_messages %}{% endblock %}
 
-  <!-- Cabeçalho Mobile -->
-  <header class="header-mobile">
-    <div class="header-top">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo" />
-      <div class="text-container">
-        <div class="escola-nome">Escola Municipal</div>
-        <div class="escola-subtitulo">José Padin Mouta</div>
-      </div>
-    </div>
-    <div class="header-bottom">
-      <span>CENTRAL DA UNIDADE</span>
-      <a href="{{ url_for('index') }}" class="btn-home-mobile" title="Página Inicial">
-        <i class="fas fa-home"></i>
-      </a>
-    </div>
-  </header>
-
-  {% include 'header_notifications.html' %}
-
-  <main>
+{% block content %}
     <div class="shell">
 
       <div class="page-header-card">
@@ -805,12 +762,9 @@
       </div>
 
     </div>
-  </main>
+{% endblock %}
 
-  <footer>
-    <p>&copy; 2026 - Desenvolvido por Nilson Cruz | Todos os direitos reservados</p>
-  </footer>
-
+{% block scripts %}
   <script>
     const btnAdd = document.getElementById('btnAdd');
     const btnRemove = document.getElementById('btnRemove');
@@ -1059,5 +1013,4 @@
       updatePdfUI();
     });
   </script>
-</body>
-</html>
+{% endblock %}

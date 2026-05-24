@@ -1,18 +1,13 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Deferir Folgas - E.M José Padin Mouta</title>
+{% extends "base.html" %}
 
-  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=yes, maximum-scale=3, minimum-scale=1" />
-  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% block title %}Deferir Folgas - E.M José Padin Mouta{% endblock %}
 
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700&display=swap" rel="stylesheet" />
+{% block head %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.inputmask/5.0.8/jquery.inputmask.min.js"></script>
+{% endblock %}
 
+{% block styles %}
   <style>
     :root {
       --primary: #0077ff;
@@ -718,45 +713,12 @@
       .status-pill { font-size: 0.7rem; }
       .hint-pill { width: 100%; justify-content: flex-start; }
     }
-  </style>
-</head>
-<body>
+    </style>
+{% endblock %}
 
-  <header class="header-desktop">
-    <div class="left-section">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo" />
-      <div class="text-container">
-        <div class="escola-nome">Escola Municipal</div>
-        <div class="escola-subtitulo">José Padin Mouta</div>
-      </div>
-    </div>
-    <div class="header-center-text-container">
-      <div class="header-center-text">CENTRAL DA UNIDADE</div>
-    </div>
-    <a href="{{ url_for('index') }}" class="btn-home" title="Página Inicial">
-      <i class="fas fa-home"></i>
-    </a>
-  </header>
+{% block flash_messages %}{% endblock %}
 
-  <header class="header-mobile">
-    <div class="header-top">
-      <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo" />
-      <div class="text-container">
-        <div class="escola-nome">Escola Municipal</div>
-        <div class="escola-subtitulo">José Padin Mouta</div>
-      </div>
-    </div>
-    <div class="header-bottom">
-      <span>CENTRAL DA UNIDADE</span>
-      <a href="{{ url_for('index') }}" class="btn-home-mobile" title="Página Inicial">
-        <i class="fas fa-home"></i>
-      </a>
-    </div>
-  </header>
-
-  {% include 'header_notifications.html' %}
-
-  <main>
+{% block content %}
     <div class="shell">
 
       <div class="page-header-card">
@@ -960,11 +922,4 @@
       </div>
 
     </div>
-  </main>
-
-  <footer>
-    <p>&copy; 2026 - Desenvolvido por Nilson Cruz | Todos os direitos reservados</p>
-  </footer>
-
-</body>
-</html>
+{% endblock %}
