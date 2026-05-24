@@ -1,75 +1,28 @@
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-  <meta charset="UTF-8">
-  <title>Agendar Folga</title>
+{% extends "base.html" %}
 
-  <!-- CSS principal -->
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% block title %}Agendar Folga{% endblock %}
 
-  <!-- Ícones -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+{% block body_class %}page-agendar{% endblock %}
 
-  <!-- Token CSRF para uso geral e eventual AJAX -->
-  <meta name="csrf-token" content="{{ csrf_token() }}">
-
-  <script>
-    // Exibe / oculta o grupo da Data de Referência conforme o motivo
-    function toggleDataReferencia() {
-      var motivo = document.getElementById("motivo").value;
-      var grupo = document.getElementById("data_banco_horas");
-      var input = document.getElementById("data_referencia");
-
-      if (!grupo || !input) return;
-
-      if (motivo === "BH") {
-        grupo.style.display = "block";
-        input.setAttribute("required", "true");
-      } else {
-        grupo.style.display = "none";
-        input.removeAttribute("required");
-        input.value = "";
-      }
+{% block styles %}
+  <style>
+    /* Estilo do título */
+    .titulo-site {
+      font-family: 'Montserrat', sans-serif;
+      font-size: 42px;
+      font-weight: 600;
+      color: #007bff;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      margin: 0;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #007bff;
+      text-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
+  </style>
+{% endblock %}
 
-    // Validação do formulário (regra mínima para BH)
-    function validateForm(event) {
-      var motivo = document.getElementById("motivo").value;
-      var input = document.getElementById("data_referencia");
-
-      if (motivo === "BH" && input && !input.value) {
-        alert("A data de referência é obrigatória quando o motivo for Banco de Horas.");
-        if (event) event.preventDefault();
-        return false;
-      }
-      return true;
-    }
-
-    // Inicialização na carga
-    window.addEventListener("DOMContentLoaded", function () {
-      // Preenche tipo_folga inicialmente e aplica o toggle
-      var motivoSel = document.getElementById("motivo");
-      var tipoFolgaField = document.getElementById("tipo_folga");
-
-      if (motivoSel && tipoFolgaField) {
-        tipoFolgaField.value = motivoSel.value;
-        motivoSel.addEventListener("change", function () {
-          tipoFolgaField.value = this.value;
-          toggleDataReferencia();
-        });
-      }
-
-      toggleDataReferencia();
-
-      // Se houver uso futuro de fetch/AJAX, padrão para enviar o header X-CSRFToken
-      // Exemplo:
-      // const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-      // fetch('/rota', { method: 'POST', headers: { 'X-CSRFToken': csrf } , body: ... })
-    });
-  </script>
-</head>
-
-<body class="page-agendar">
+{% block content %}
   <div class="titulo-container">
     <h1 class="titulo-site">Gestão de Ponto E.M José Padin Mouta</h1>
   </div>
@@ -133,24 +86,61 @@
     </a>
   </div>
 
-  <footer>
-    <p>&copy; 2026 - Desenvolvido por Nilson Cruz | Todos os direitos reservados</p>
-  </footer>
+{% endblock %}
 
-  <style>
-    /* Estilo do título */
-    .titulo-site {
-      font-family: 'Montserrat', sans-serif;
-      font-size: 42px;
-      font-weight: 600;
-      color: #007bff;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin: 0;
-      padding-bottom: 10px;
-      border-bottom: 2px solid #007bff;
-      text-shadow: 0 4px 6px rgba(0,0,0,0.1);
+{% block scripts %}
+  <script>
+    // Exibe / oculta o grupo da Data de Referência conforme o motivo
+    function toggleDataReferencia() {
+      var motivo = document.getElementById("motivo").value;
+      var grupo = document.getElementById("data_banco_horas");
+      var input = document.getElementById("data_referencia");
+
+      if (!grupo || !input) return;
+
+      if (motivo === "BH") {
+        grupo.style.display = "block";
+        input.setAttribute("required", "true");
+      } else {
+        grupo.style.display = "none";
+        input.removeAttribute("required");
+        input.value = "";
+      }
     }
-  </style>
-</body>
-</html>
+
+    // Validação do formulário (regra mínima para BH)
+    function validateForm(event) {
+      var motivo = document.getElementById("motivo").value;
+      var input = document.getElementById("data_referencia");
+
+      if (motivo === "BH" && input && !input.value) {
+        alert("A data de referência é obrigatória quando o motivo for Banco de Horas.");
+        if (event) event.preventDefault();
+        return false;
+      }
+      return true;
+    }
+
+    // Inicialização na carga
+    window.addEventListener("DOMContentLoaded", function () {
+      // Preenche tipo_folga inicialmente e aplica o toggle
+      var motivoSel = document.getElementById("motivo");
+      var tipoFolgaField = document.getElementById("tipo_folga");
+
+      if (motivoSel && tipoFolgaField) {
+        tipoFolgaField.value = motivoSel.value;
+        motivoSel.addEventListener("change", function () {
+          tipoFolgaField.value = this.value;
+          toggleDataReferencia();
+        });
+      }
+
+      toggleDataReferencia();
+
+      // Se houver uso futuro de fetch/AJAX, padrão para enviar o header X-CSRFToken
+      // Exemplo:
+      // const csrf = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+      // fetch('/rota', { method: 'POST', headers: { 'X-CSRFToken': csrf } , body: ... })
+    });
+  </script>
+{% endblock %}

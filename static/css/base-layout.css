@@ -127,12 +127,18 @@ textarea:focus-visible {
     text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   }
 
+  .header-actions {
+    position: absolute !important;
+    right: 30px !important;
+    top: 50% !important;
+    z-index: 2 !important;
+    transform: translateY(-50%) !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+  }
+
   .btn-home {
-    position: absolute;
-    right: 30px;
-    top: 50%;
-    z-index: 2;
-    transform: translateY(-50%);
     display: flex;
     align-items: center;
     gap: 8px;
@@ -147,10 +153,46 @@ textarea:focus-visible {
     transition: transform 0.12s ease, background-color 0.2s ease;
   }
 
+  .header-actions .btn-home {
+    position: static !important;
+    right: auto !important;
+    top: auto !important;
+    z-index: auto !important;
+    transform: none !important;
+  }
+
   .btn-home:hover {
     background: #0d8a00;
-    transform: translateY(-52%);
+    transform: translateY(-1px);
     text-decoration: none;
+  }
+
+  .header-actions .btn-home:hover {
+    transform: translateY(-1px) !important;
+  }
+
+  .btn-header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: #111827;
+    color: #fff;
+    font-family: inherit;
+    font-weight: 800;
+    font-size: 1.05rem;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(17, 24, 39, 0.35);
+    transition: transform 0.12s ease, background-color 0.2s ease;
+  }
+
+  .btn-header-action:hover {
+    background: #0b1220;
+    transform: translateY(-1px);
   }
 }
 
@@ -240,6 +282,28 @@ textarea:focus-visible {
   .btn-home-mobile:hover {
     background: #0d8a00;
     text-decoration: none;
+  }
+
+  .btn-header-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: #111827;
+    color: #fff;
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 0.95rem;
+    line-height: 1;
+    text-decoration: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(17, 24, 39, 0.35);
+  }
+
+  .btn-header-action:hover {
+    background: #0b1220;
   }
 }
 

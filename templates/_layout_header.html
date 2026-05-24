@@ -1,6 +1,7 @@
 {% set _home_endpoint = layout_home_endpoint|default('index') %}
 {% set _home_title = layout_home_title|default('Página Inicial') %}
 {% set _home_label = layout_home_label|default('Início') %}
+{% set _show_print_button = layout_show_print_button|default(false) %}
 
 <header class="header-desktop">
   <div class="left-section">
@@ -15,10 +16,19 @@
     <div class="header-center-text">CENTRAL DA UNIDADE</div>
   </div>
 
-  <a href="{{ url_for(_home_endpoint) }}" class="btn-home" title="{{ _home_title }}">
-    <i class="fas fa-home" aria-hidden="true"></i>
-    <span class="sr-only">{{ _home_label }}</span>
-  </a>
+  <div class="header-actions">
+    {% if _show_print_button %}
+      <button type="button" class="btn-header-action btn-print" onclick="window.print()" title="Imprimir">
+        <i class="fas fa-print" aria-hidden="true"></i>
+        <span>Imprimir</span>
+      </button>
+    {% endif %}
+
+    <a href="{{ url_for(_home_endpoint) }}" class="btn-home" title="{{ _home_title }}">
+      <i class="fas fa-home" aria-hidden="true"></i>
+      <span class="sr-only">{{ _home_label }}</span>
+    </a>
+  </div>
 </header>
 
 <header class="header-mobile">
@@ -31,6 +41,13 @@
   </div>
   <div class="header-bottom">
     <span>CENTRAL DA UNIDADE</span>
+    {% if _show_print_button %}
+      <button type="button" class="btn-header-action btn-print-mobile" onclick="window.print()" title="Imprimir">
+        <i class="fas fa-print" aria-hidden="true"></i>
+        <span>Imprimir</span>
+      </button>
+    {% endif %}
+
     <a href="{{ url_for(_home_endpoint) }}" class="btn-home-mobile" title="{{ _home_title }}">
       <i class="fas fa-home" aria-hidden="true"></i>
       <span class="sr-only">{{ _home_label }}</span>
