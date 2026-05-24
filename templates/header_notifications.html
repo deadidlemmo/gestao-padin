@@ -1,4 +1,5 @@
 {# templates/header_notifications.html #}
+{% if current_user.is_authenticated %}
 {% set _unread = (notif_unread|default(0, true)) %}
 {% set _list = (notifications|default([], true)) %}
 
@@ -397,6 +398,7 @@
   async function postJSON(url){
     const res = await fetch(url, {
       method: 'POST',
+      credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         ...(csrf ? {'X-CSRFToken': csrf, 'X-CSRF-Token': csrf} : {})
@@ -436,3 +438,4 @@
   }
 })();
 </script>
+{% endif %}

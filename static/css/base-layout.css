@@ -1,0 +1,315 @@
+:root {
+  --app-brand: #007bff;
+  --app-brand-dark: #0056b3;
+  --app-bg: #f3f4f6;
+  --app-ink: #0f172a;
+  --app-muted: #6b7280;
+  --app-focus: 0 0 0 3px rgba(0, 123, 255, 0.18);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: "Montserrat", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--app-bg);
+  color: var(--app-ink);
+  overflow-x: hidden;
+}
+
+main {
+  flex: 1 0 auto;
+  padding: 24px 16px 96px;
+}
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: var(--app-focus);
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+.header-desktop,
+.header-mobile {
+  display: none;
+  flex-shrink: 0;
+}
+
+@media (min-width: 769px) {
+  .header-desktop {
+    display: flex;
+    min-height: 110px;
+    width: 100%;
+    padding: 15px 30px;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    background: var(--app-brand);
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  .left-section {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .logo {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    padding: 6px;
+  }
+
+  .text-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: left;
+    color: #fff;
+  }
+
+  .escola-nome {
+    font-weight: 700;
+    font-size: 1.6rem;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .escola-subtitulo {
+    font-weight: 600;
+    font-size: 1.1rem;
+    margin-top: 4px;
+  }
+
+  .header-center-text-container {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    user-select: none;
+    z-index: 1;
+  }
+
+  .header-center-text {
+    font-weight: 800;
+    font-size: 1.9rem;
+    color: #fff;
+    letter-spacing: 5px;
+    white-space: nowrap;
+    text-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+  }
+
+  .btn-home {
+    position: absolute;
+    right: 30px;
+    top: 50%;
+    z-index: 2;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border-radius: 8px;
+    background: #0fb300;
+    color: #fff;
+    font-weight: 800;
+    font-size: 1.5rem;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(15, 179, 0, 0.8);
+    transition: transform 0.12s ease, background-color 0.2s ease;
+  }
+
+  .btn-home:hover {
+    background: #0d8a00;
+    transform: translateY(-52%);
+    text-decoration: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-mobile {
+    display: block;
+    width: 100%;
+    color: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: var(--app-brand);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  }
+
+  .header-top {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    padding: 10px 15px;
+    background: var(--app-brand);
+    text-align: center;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 10px;
+    background: #fff;
+    padding: 6px;
+  }
+
+  .text-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    color: #fff;
+    text-align: center;
+  }
+
+  .escola-nome {
+    font-weight: 700;
+    font-size: 1.3rem;
+    margin: 0;
+    line-height: 1.1;
+  }
+
+  .escola-subtitulo {
+    font-weight: 600;
+    font-size: 1rem;
+    margin-top: 2px;
+  }
+
+  .header-bottom {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 10px;
+    background: var(--app-brand-dark);
+    color: #fff;
+    text-align: center;
+    font-weight: 800;
+    font-size: 1rem;
+    letter-spacing: 4px;
+    user-select: none;
+    white-space: nowrap;
+    box-shadow: inset 0 -2px 5px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-home-mobile {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
+    border-radius: 8px;
+    background: #0fb300;
+    color: #fff;
+    font-weight: 700;
+    font-size: 1rem;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(15, 179, 0, 0.8);
+  }
+
+  .btn-home-mobile:hover {
+    background: #0d8a00;
+    text-decoration: none;
+  }
+}
+
+.app-flash-container {
+  width: min(100%, 1120px);
+  margin: 0 auto 16px;
+}
+
+.app-flash-container .flash {
+  padding: 12px 14px;
+  margin: 8px 0;
+  border-radius: 14px;
+  width: 100%;
+  font-weight: 800;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  border: 1px solid transparent;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+  overflow-wrap: anywhere;
+}
+
+.app-flash-container .flash a {
+  color: inherit;
+  text-decoration: underline;
+  font-weight: 900;
+}
+
+.app-flash-container .flash.message,
+.app-flash-container .flash.info {
+  background: #dbeafe;
+  color: #1e3a8a;
+  border-color: #bfdbfe;
+  border-left: 6px solid #3b82f6;
+}
+
+.app-flash-container .flash.success {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+  border-left: 6px solid #22c55e;
+}
+
+.app-flash-container .flash.error,
+.app-flash-container .flash.danger {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+  border-left: 6px solid #ef4444;
+}
+
+.app-flash-container .flash.warning {
+  background: #ffedd5;
+  color: #7c2d12;
+  border-color: #fed7aa;
+  border-left: 6px solid #fb923c;
+}
+
+footer {
+  flex-shrink: 0;
+  width: 100%;
+  padding: 15px 0;
+  background: linear-gradient(to right, #222, #444);
+  color: #ddd;
+  text-align: center;
+  font-size: 14px;
+  border-top: 2px solid #555;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+footer p {
+  margin: 5px 0;
+  font-size: 0.9rem;
+}

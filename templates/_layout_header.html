@@ -1,0 +1,37 @@
+<header class="header-desktop">
+  <div class="left-section">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo">
+    <div class="text-container">
+      <div class="escola-nome">Escola Municipal</div>
+      <div class="escola-subtitulo">Jos&eacute; Padin Mouta</div>
+    </div>
+  </div>
+
+  <div class="header-center-text-container">
+    <div class="header-center-text">CENTRAL DA UNIDADE</div>
+  </div>
+
+  <a href="{{ url_for('index') }}" class="btn-home" title="P&aacute;gina Inicial">
+    <i class="fas fa-home" aria-hidden="true"></i>
+    <span class="sr-only">In&iacute;cio</span>
+  </a>
+</header>
+
+<header class="header-mobile">
+  <div class="header-top">
+    <img src="{{ url_for('static', filename='img/logo.png') }}" alt="Logo da Escola" class="logo">
+    <div class="text-container">
+      <div class="escola-nome">Escola Municipal</div>
+      <div class="escola-subtitulo">Jos&eacute; Padin Mouta</div>
+    </div>
+  </div>
+  <div class="header-bottom">
+    <span>CENTRAL DA UNIDADE</span>
+    <a href="{{ url_for('index') }}" class="btn-home-mobile" title="P&aacute;gina Inicial">
+      <i class="fas fa-home" aria-hidden="true"></i>
+      <span class="sr-only">In&iacute;cio</span>
+    </a>
+  </div>
+</header>
+
+{% include "header_notifications.html" %}

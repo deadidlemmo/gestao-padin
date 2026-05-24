@@ -1,0 +1,20 @@
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="flash-container app-flash-container" aria-live="polite">
+      {% for category, message in messages %}
+        <div class="flash {{ category }}" role="alert">
+          {{ message|safe }}
+        </div>
+      {% endfor %}
+    </div>
+    <script>
+      setTimeout(() => {
+        document.querySelectorAll(".app-flash-container .flash").forEach((flash) => {
+          flash.style.transition = "opacity 1s ease";
+          flash.style.opacity = "0";
+          setTimeout(() => flash.remove(), 1000);
+        });
+      }, 8000);
+    </script>
+  {% endif %}
+{% endwith %}

@@ -904,6 +904,173 @@ class UserHorarioTrabalho(db.Model):
 
 
 # ===========================================
+# NOTIFICACOES GLOBAIS (sem nova tabela)
+# ===========================================
+def _eventos_nao_lidos_query(user_id: int):
+    read_exists = (
+        db.session.query(EventoVisto.id)
+        .filter(
+            EventoVisto.user_id == user_id,
+            EventoVisto.evento_id == Evento.id,
+        )
+        .exists()
+    )
+
+    data_final = func.coalesce(Evento.data_fim, Evento.data_inicio, Evento.data_evento)
+
+    return (
+        Evento.query.filter(Evento.ativo.is_(True))
+        .filter(data_final >= date.today())
+        .filter(~read_exists)
+        .order_by(Evento.criado_em.desc(), Evento.data_evento.asc(), Evento.id.desc())
+    )
+
+
+def _release_notes_nao_lidas_query(user_id: int):
+    read_exists = (
+        db.session.query(ReleaseNoteRead.id)
+        .filter(
+            ReleaseNoteRead.user_id == user_id,
+            ReleaseNoteRead.release_id == ReleaseNote.id,
+        )
+        .exists()
+    )
+
+    return (
+        ReleaseNote.query.filter(ReleaseNote.is_published.is_(True))
+        .filter(~read_exists)
+        .order_by(ReleaseNote.created_at.desc(), ReleaseNote.id.desc())
+    )
+
+
+def _fmt_notif_date(value):
+    if not value:
+        return ""
+    try:
+        return value.strftime("%d/%m/%Y")
+    except Exception:
+        return str(value)
+
+
+def _build_header_notifications(user, limit: int = 8):
+    if not user or not getattr(user, "is_authenticated", False):
+        return [], 0
+
+    items = []
+
+    eventos = _eventos_nao_lidos_query(user.id).limit(limit).all()
+    for ev in eventos:
+        ref_date = ev.data_inicio or ev.data_evento or ev.data_fim
+        if ev.data_inicio and ev.data_fim and ev.data_inicio != ev.data_fim:
+            when = f"{_fmt_notif_date(ev.data_inicio)} ate {_fmt_notif_date(ev.data_fim)}"
+        else:
+            when = _fmt_notif_date(ref_date)
+
+        url = url_for("calendario")
+        if ref_date:
+            url = url_for("calendario", year=ref_date.year, month=ref_date.month)
+
+        items.append(
+            {
+                "kind": "event",
+                "id": ev.id,
+                "title": ev.nome or "Evento no calendario",
+                "body": when or (ev.descricao or ""),
+                "created_at": "Evento",
+                "level": "info",
+                "url": url,
+                "read": False,
+            }
+        )
+
+    if (getattr(user, "tipo", "") or "").strip().lower() == "administrador":
+        remaining = max(limit - len(items), 0)
+        if remaining:
+            notes = _release_notes_nao_lidas_query(user.id).limit(remaining).all()
+            severity_level = {
+                "info": "info",
+                "improvement": "success",
+                "fix": "warning",
+                "breaking": "danger",
+            }
+            for note in notes:
+                items.append(
+                    {
+                        "kind": "release",
+                        "id": note.id,
+                        "title": note.title or "Atualizacao do sistema",
+                        "body": f"Versao {note.version}" if note.version else "",
+                        "created_at": _fmt_notif_date(note.created_at),
+                        "level": severity_level.get(note.severity, "info"),
+                        "url": url_for("admin_patch_notes_page"),
+                        "read": False,
+                    }
+                )
+
+    return items, len(items)
+
+
+@app.context_processor
+def inject_header_notifications():
+    try:
+        notifications, unread = _build_header_notifications(current_user)
+        return {"notifications": notifications, "notif_unread": unread}
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao montar notificacoes do cabecalho.")
+        return {"notifications": [], "notif_unread": 0}
+
+
+def _mark_all_notifications_read(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {"events": 0, "releases": 0}
+
+    marked_events = 0
+    for ev in _eventos_nao_lidos_query(user.id).all():
+        exists = EventoVisto.query.filter_by(user_id=user.id, evento_id=ev.id).first()
+        if not exists:
+            db.session.add(EventoVisto(user_id=user.id, evento_id=ev.id))
+            marked_events += 1
+
+    marked_releases = 0
+    if (getattr(user, "tipo", "") or "").strip().lower() == "administrador":
+        for note in _release_notes_nao_lidas_query(user.id).all():
+            exists = ReleaseNoteRead.query.filter_by(
+                user_id=user.id, release_id=note.id
+            ).first()
+            if not exists:
+                db.session.add(ReleaseNoteRead(user_id=user.id, release_id=note.id))
+                marked_releases += 1
+
+    db.session.commit()
+    return {"events": marked_events, "releases": marked_releases}
+
+
+@app.route("/notifications/mark_all_read", methods=["POST"])
+@login_required
+def notifications_mark_all_read():
+    try:
+        marked = _mark_all_notifications_read(current_user)
+        return jsonify({"ok": True, "marked": marked, "unread": 0})
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao marcar notificacoes como lidas.")
+        return jsonify({"ok": False, "error": "Falha ao atualizar notificacoes."}), 500
+
+
+@app.route("/notifications/clear", methods=["POST"])
+@login_required
+def notifications_clear():
+    try:
+        marked = _mark_all_notifications_read(current_user)
+        return jsonify({"ok": True, "marked": marked, "unread": 0})
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao limpar notificacoes.")
+        return jsonify({"ok": False, "error": "Falha ao limpar notificacoes."}), 500
+
+
+# ===========================================
 # E-MAIL — Função genérica (corrigida e robusta)
 # ===========================================
 def enviar_email(destinatario, assunto, mensagem_html, mensagem_texto=None):
@@ -1577,42 +1744,8 @@ def index():
         """
         flash(mensagem_opcional, "info")
 
-    # ======================================================
-    # 2) OPÇÃO B: Notificação de novos eventos (1ª visita após criar)
-    #    - Busca eventos não vistos do usuário (evento_visto)
-    #    - Exibe flash no index
-    #    - Marca como visto para não repetir
-    #
-    # Requer que no seu app existam os helpers:
-    #   _get_eventos_nao_vistos(user_id, limit)
-    #   _marcar_eventos_como_vistos(user_id, evento_ids)
-    # ======================================================
-    try:
-        novos_eventos = _get_eventos_nao_vistos(usuario.id, limit=3)
-        if novos_eventos:
-            itens = []
-            for ev in novos_eventos:
-                # Mostra data principal (quando existir) de forma amigável
-                data_principal = ev.get("data_evento")
-                if data_principal:
-                    try:
-                        data_fmt = data_principal.strftime("%d/%m/%Y")
-                    except Exception:
-                        data_fmt = str(data_principal)
-                    itens.append(
-                        f"• <strong>{ev.get('nome', 'Evento')}</strong> <span style='opacity:.85'>( {data_fmt} )</span>"
-                    )
-                else:
-                    itens.append(f"• <strong>{ev.get('nome', 'Evento')}</strong>")
-
-            flash("Novos eventos no calendário:<br>" + "<br>".join(itens), "warning")
-
-            _marcar_eventos_como_vistos(
-                usuario.id, [ev["id"] for ev in novos_eventos if ev.get("id")]
-            )
-    except Exception:
-        # Não derruba o index por falha de notificação; mantém UX do portal
-        pass
+    # As novidades do calendario agora ficam no sino global de notificacoes.
+    # Isso evita marcar eventos como vistos automaticamente ao abrir o index.
 
     return render_template("index.html", usuario=usuario)
 
