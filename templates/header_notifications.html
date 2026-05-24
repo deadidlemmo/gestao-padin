@@ -71,8 +71,8 @@
 
   .gp-notify{
     --gp-brand: var(--brand, #007bff);
-    --gp-ink: #ffffff;
-    --gp-border: rgba(255,255,255,.28);
+    --gp-ink: var(--brand, #007bff);
+    --gp-border: rgba(0,123,255,.26);
     --gp-shadow: 0 18px 50px rgba(15,23,42,.18);
     --gp-card: #ffffff;
     --gp-text: var(--ink, #0f172a);
@@ -90,6 +90,14 @@
       top: 55px;
       transform: translateY(-50%);
       right: 92px;
+    }
+
+    .header-actions .gp-notify{
+      position: static !important;
+      top: auto !important;
+      right: auto !important;
+      transform: none !important;
+      z-index: auto !important;
     }
   }
 
@@ -119,18 +127,24 @@
     height: 40px;
     border-radius: 12px;
     border: 1px solid var(--gp-border);
-    background: rgba(255,255,255,.16);
+    background: rgba(255,255,255,.94);
     color: var(--gp-ink);
     display: grid;
     place-items: center;
     cursor: pointer;
-    box-shadow: 0 10px 22px rgba(0,0,0,.14);
+    box-shadow: 0 8px 18px rgba(15,23,42,.18);
     backdrop-filter: blur(8px);
     transition: transform .12s ease, background .12s ease, border-color .12s ease;
   }
+  .gp-iconbtn .fa-bell{
+    display:block;
+    color: currentColor !important;
+    font-size: 1.05rem;
+    line-height: 1;
+  }
   .gp-iconbtn:hover{
-    background: rgba(255,255,255,.24);
-    border-color: rgba(255,255,255,.40);
+    background: #ffffff;
+    border-color: rgba(0,123,255,.45);
   }
   .gp-iconbtn:active{ transform: scale(.98); }
 
@@ -286,7 +300,8 @@
   function positionMenuFixed(){
     // Só usa posição fixed quando estiver dockado no header-bottom (mobile)
     const docked = root.classList.contains('gp-notify--docked');
-    if(!docked){
+    const inHeaderActions = !!root.closest('.header-actions');
+    if(!docked || inHeaderActions){
       // limpa estilos inline para voltar ao CSS padrão (absolute)
       menu.style.position = '';
       menu.style.left = '';

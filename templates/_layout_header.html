@@ -24,6 +24,8 @@
       </button>
     {% endif %}
 
+    {% include "header_notifications.html" %}
+
     <a href="{{ url_for(_home_endpoint) }}" class="btn-home" title="{{ _home_title }}">
       <i class="fas fa-home" aria-hidden="true"></i>
       <span class="sr-only">{{ _home_label }}</span>
@@ -54,5 +56,3 @@
     </a>
   </div>
 </header>
-
-{% include "header_notifications.html" %}
