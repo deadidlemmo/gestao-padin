@@ -5227,6 +5227,21 @@ def relatorio_ponto():
         flash("Acesso negado.", "danger")
         return redirect(url_for("index"))
 
+    meses = [
+        "Janeiro",
+        "Fevereiro",
+        "Março",
+        "Abril",
+        "Maio",
+        "Junho",
+        "Julho",
+        "Agosto",
+        "Setembro",
+        "Outubro",
+        "Novembro",
+        "Dezembro",
+    ]
+
     mes_selecionado = request.args.get("mes", type=int)
     ano_selecionado = request.args.get("ano", type=int) or datetime.datetime.now().year
 
@@ -5431,6 +5446,7 @@ def relatorio_ponto():
     return render_template(
         "relatorio_ponto.html",
         registros=registros,
+        meses=meses,
         mes_selecionado=mes_selecionado,
         ano_selecionado=ano_selecionado,
         periodo_inicio=periodo_inicio,
