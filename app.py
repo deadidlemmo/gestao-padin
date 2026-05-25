@@ -2943,27 +2943,54 @@ def _periodo_declaracao_agendamento(agendamento):
 
 
 def _horario_declaracao_usuario(usuario, data_ref):
-    if not usuario or not data_ref:
+    if not usuario:
         return "..........................................................................................................."
 
     try:
-        horarios = (
-            UserHorarioTrabalho.query.filter(
-                UserHorarioTrabalho.user_id == usuario.id,
-                UserHorarioTrabalho.ativo.is_(True),
-                UserHorarioTrabalho.dia_semana == data_ref.weekday(),
-                UserHorarioTrabalho.vigencia_inicio <= data_ref,
-                or_(
-                    UserHorarioTrabalho.vigencia_fim.is_(None),
-                    UserHorarioTrabalho.vigencia_fim >= data_ref,
-                ),
-            )
-            .order_by(
-                UserHorarioTrabalho.vigencia_inicio.desc(),
-                UserHorarioTrabalho.hora_inicio.asc(),
-            )
-            .all()
+        base_query = UserHorarioTrabalho.query.filter(
+            UserHorarioTrabalho.user_id == usuario.id,
+            UserHorarioTrabalho.ativo.is_(True),
         )
+
+        horarios = []
+        if data_ref:
+            horarios = (
+                base_query.filter(
+                    UserHorarioTrabalho.dia_semana == data_ref.weekday(),
+                    UserHorarioTrabalho.vigencia_inicio <= data_ref,
+                    or_(
+                        UserHorarioTrabalho.vigencia_fim.is_(None),
+                        UserHorarioTrabalho.vigencia_fim >= data_ref,
+                    ),
+                )
+                .order_by(
+                    UserHorarioTrabalho.vigencia_inicio.desc(),
+                    UserHorarioTrabalho.hora_inicio.asc(),
+                )
+                .all()
+            )
+
+            if not horarios:
+                horarios = (
+                    base_query.filter(
+                        UserHorarioTrabalho.dia_semana == data_ref.weekday()
+                    )
+                    .order_by(
+                        UserHorarioTrabalho.vigencia_inicio.desc(),
+                        UserHorarioTrabalho.hora_inicio.asc(),
+                    )
+                    .all()
+                )
+
+        if not horarios:
+            horarios = (
+                base_query.order_by(
+                    UserHorarioTrabalho.dia_semana.asc(),
+                    UserHorarioTrabalho.vigencia_inicio.desc(),
+                    UserHorarioTrabalho.hora_inicio.asc(),
+                )
+                .all()
+            )
     except Exception:
         current_app.logger.exception(
             "Falha ao buscar horario da declaracao do usuario %s",
@@ -3051,8 +3078,8 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     content_w = w - (2 * margin_x)
     body_font = "Helvetica"
     title_font = "Helvetica-Bold"
-    body_size = 10.0
-    leading = 13.0
+    body_size = 10.8
+    leading = 14.0
 
     c.setFillColor(colors.white)
     c.rect(0, 0, w, h, stroke=0, fill=1)
@@ -3124,10 +3151,10 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     draw_underlined_centered(
         "DECLARAÇÃO PARA JUSTIFICATIVA DO PONTO ELETRÔNICO-UNIDADES",
         y,
-        size=10.6,
+        size=11.0,
     )
     y -= 12
-    draw_underlined_centered("ESCOLARES", y, size=10.6)
+    draw_underlined_centered("ESCOLARES", y, size=11.0)
     y -= 27
 
     left = margin_x
@@ -3166,7 +3193,7 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     ]
 
     set_font(body_font, body_size)
-    line_h = 11.4
+    line_h = 12.0
     for opcao in opcoes:
         mark = "( X )" if opcao == motivo_label else "(  )"
         c.drawString(left, y, f"{mark} {opcao}")

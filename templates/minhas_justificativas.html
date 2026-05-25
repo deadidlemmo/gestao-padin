@@ -412,7 +412,7 @@
                   <th>Motivo</th>
                   <th>Status</th>
                   <th>Substituição</th>
-                  <th>Documentos</th>
+                  <th>Declaração</th>
                   <th>Opções</th>
                 </tr>
               </thead>
@@ -476,25 +476,17 @@
                   <!-- Documentos PDF -->
                   <td>
                     <div class="doc-links">
-                      {% if s not in ['em_espera', 'pendente'] %}
-                        <a class="proto-link"
-                           href="{{ url_for('agendamento_protocolo', agendamento_id=ag.id) }}"
-                           target="_blank"
-                           rel="noopener"
-                           title="Abrir protocolo em PDF">
-                          <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                          <span>Protocolo</span>
-                        </a>
-                      {% endif %}
                       {% if s in ['em_espera', 'pendente', 'deferido'] %}
                         <a class="proto-link declaration-link"
                            href="{{ url_for('agendamento_declaracao_ponto', agendamento_id=ag.id) }}"
                            target="_blank"
                            rel="noopener"
-                           title="{% if s == 'deferido' %}Abrir declaração institucional assinada{% else %}Abrir declaração prévia sem assinatura{% endif %}">
+                           title="{% if s == 'deferido' %}Abrir declaração institucional assinada{% else %}Abrir declaração sem assinatura da chefia{% endif %}">
                           <i class="fas fa-file-signature" aria-hidden="true"></i>
-                          <span>{% if s == 'deferido' %}Declaração{% else %}Prévia{% endif %}</span>
+                          <span>Declaração</span>
                         </a>
+                      {% else %}
+                        <span style="font-size:.8rem; color:#6b7280;">—</span>
                       {% endif %}
                     </div>
                   </td>
