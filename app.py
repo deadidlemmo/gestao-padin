@@ -2855,6 +2855,7 @@ DECLARACAO_PONTO_CHEFIA_RF = "28045"
 DECLARACAO_PONTO_CHEFIA_CARGO = "Diretor de Unidade Escolar"
 DECLARACAO_PONTO_ESCOLA = "E.M José Padin Mouta"
 DECLARACAO_PONTO_ASSINATURA_ARQUIVOS = (
+    "assinatura.png",
     "assinatura_diretora_carimbo.png",
     "assinatura_diretora_carimbo.jpg",
     "assinatura_diretora.png",
@@ -3038,11 +3039,15 @@ def _is_agendamento_deferido(agendamento) -> bool:
 
 
 def _assinatura_diretora_abs_path():
-    img_dir = Path(current_app.root_path) / "static" / "img"
-    for filename in DECLARACAO_PONTO_ASSINATURA_ARQUIVOS:
-        path = img_dir / filename
-        if path.is_file():
-            return str(path)
+    base_dirs = (
+        Path(current_app.root_path),
+        Path(current_app.root_path) / "static" / "img",
+    )
+    for base_dir in base_dirs:
+        for filename in DECLARACAO_PONTO_ASSINATURA_ARQUIVOS:
+            path = base_dir / filename
+            if path.is_file():
+                return str(path)
     return None
 
 
@@ -3224,10 +3229,10 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
         if assinatura_path:
             try:
                 assinatura_img = ImageReader(assinatura_path)
-                img_w = min(68 * mm, right - sig_x - 8 * mm)
-                img_h = 25 * mm
-                img_x = sig_x + 7 * mm
-                img_y = y - 8 * mm
+                img_w = min(82 * mm, right - sig_x - 4 * mm)
+                img_h = 31 * mm
+                img_x = sig_x + 5 * mm
+                img_y = y - 12 * mm
                 c.drawImage(
                     assinatura_img,
                     img_x,
