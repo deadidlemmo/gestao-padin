@@ -2854,6 +2854,12 @@ DECLARACAO_PONTO_CHEFIA_NOME = "Luciana Rocha Augustinho"
 DECLARACAO_PONTO_CHEFIA_RF = "28045"
 DECLARACAO_PONTO_CHEFIA_CARGO = "Diretor de Unidade Escolar"
 DECLARACAO_PONTO_ESCOLA = "E.M José Padin Mouta"
+DECLARACAO_PONTO_ASSINATURA_ARQUIVOS = (
+    "assinatura_diretora_carimbo.png",
+    "assinatura_diretora_carimbo.jpg",
+    "assinatura_diretora.png",
+    "assinatura_diretora.jpg",
+)
 
 
 def _fmt_data_declaracao(dt):
@@ -3004,17 +3010,24 @@ def _is_agendamento_deferido(agendamento) -> bool:
     return status.startswith("deferid")
 
 
+def _assinatura_diretora_abs_path():
+    img_dir = Path(current_app.root_path) / "static" / "img"
+    for filename in DECLARACAO_PONTO_ASSINATURA_ARQUIVOS:
+        path = img_dir / filename
+        if path.is_file():
+            return str(path)
+    return None
+
+
 def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     """
     Gera a declaracao institucional para justificativa do ponto eletronico.
-    Deve ser usada somente para agendamentos deferidos.
+    Em deferidos, aplica a imagem de assinatura/carimbo da chefia se existir.
     """
     from reportlab.pdfbase.pdfmetrics import stringWidth
 
-    if not _is_agendamento_deferido(agendamento):
-        raise ValueError("Declaracao de ponto disponivel apenas para deferidos.")
-
     pdf_path = _declaracao_ponto_abs_path(agendamento.id)
+    deferido = _is_agendamento_deferido(agendamento)
     dt_ini, dt_fim = _periodo_declaracao_agendamento(agendamento)
     periodo = bool(dt_ini and dt_fim and dt_fim != dt_ini)
     referencia = (
@@ -3038,8 +3051,8 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     content_w = w - (2 * margin_x)
     body_font = "Helvetica"
     title_font = "Helvetica-Bold"
-    body_size = 9.3
-    leading = 12.0
+    body_size = 10.0
+    leading = 13.0
 
     c.setFillColor(colors.white)
     c.rect(0, 0, w, h, stroke=0, fill=1)
@@ -3111,10 +3124,10 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     draw_underlined_centered(
         "DECLARAÇÃO PARA JUSTIFICATIVA DO PONTO ELETRÔNICO-UNIDADES",
         y,
-        size=10.2,
+        size=10.6,
     )
     y -= 12
-    draw_underlined_centered("ESCOLARES", y, size=10.2)
+    draw_underlined_centered("ESCOLARES", y, size=10.6)
     y -= 27
 
     left = margin_x
@@ -3153,7 +3166,7 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     ]
 
     set_font(body_font, body_size)
-    line_h = 10.7
+    line_h = 11.4
     for opcao in opcoes:
         mark = "( X )" if opcao == motivo_label else "(  )"
         c.drawString(left, y, f"{mark} {opcao}")
@@ -3179,6 +3192,29 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     c.drawString(left, y, assinatura_chefia)
     sig_x = left + stringWidth(assinatura_chefia, body_font, body_size) + 4
     c.line(sig_x, y - 2, right, y - 2)
+    if deferido:
+        assinatura_path = _assinatura_diretora_abs_path()
+        if assinatura_path:
+            try:
+                assinatura_img = ImageReader(assinatura_path)
+                img_w = min(68 * mm, right - sig_x - 8 * mm)
+                img_h = 25 * mm
+                img_x = sig_x + 7 * mm
+                img_y = y - 8 * mm
+                c.drawImage(
+                    assinatura_img,
+                    img_x,
+                    img_y,
+                    width=img_w,
+                    height=img_h,
+                    preserveAspectRatio=True,
+                    mask="auto",
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao inserir assinatura da diretora na declaracao %s",
+                    getattr(agendamento, "id", None),
+                )
     c.drawString(right + 1, y, ".")
 
     c.showPage()
@@ -3239,9 +3275,6 @@ def agendamento_declaracao_ponto(agendamento_id):
 
     if current_user.tipo != "administrador" and ag.funcionario_id != current_user.id:
         abort(403)
-
-    if not _is_agendamento_deferido(ag):
-        abort(404)
 
     usuario = User.query.get(ag.funcionario_id)
     if not usuario:
