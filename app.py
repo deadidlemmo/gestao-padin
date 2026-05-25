@@ -3009,18 +3009,17 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     Gera a declaracao institucional para justificativa do ponto eletronico.
     Deve ser usada somente para agendamentos deferidos.
     """
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
     if not _is_agendamento_deferido(agendamento):
         raise ValueError("Declaracao de ponto disponivel apenas para deferidos.")
 
     pdf_path = _declaracao_ponto_abs_path(agendamento.id)
     dt_ini, dt_fim = _periodo_declaracao_agendamento(agendamento)
     periodo = bool(dt_ini and dt_fim and dt_fim != dt_ini)
-    data_dia = "......../......../20......" if periodo else _fmt_data_declaracao(dt_ini)
-    periodo_txt = (
-        f"{_fmt_data_declaracao(dt_ini)} a {_fmt_data_declaracao(dt_fim)}"
-        if periodo
-        else "......./....../20....... a ......../......./20......"
-    )
+    data_dia = "" if periodo else _fmt_data_declaracao(dt_ini)
+    periodo_ini = _fmt_data_declaracao(dt_ini) if periodo else ""
+    periodo_fim = _fmt_data_declaracao(dt_fim) if periodo else ""
     horario = _horario_declaracao_usuario(usuario, dt_ini)
     servidor_nome = getattr(usuario, "nome", "") or "................................................................"
     servidor_rf = getattr(usuario, "registro", "") or ".............."
@@ -3032,12 +3031,51 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     c.setAuthor(DECLARACAO_PONTO_ESCOLA)
 
     w, h = A4
-    margin_x = 18 * mm
-    y = h - 18 * mm
+    margin_x = 26 * mm
+    y = h - 22 * mm
     content_w = w - (2 * margin_x)
+    font_size = 9.0
+    leading = 11.0
 
     c.setFillColor(colors.white)
     c.rect(0, 0, w, h, stroke=0, fill=1)
+
+    def set_body_font(bold=False, size=font_size):
+        c.setFillColor(colors.black)
+        c.setFont("Helvetica-Bold" if bold else "Helvetica", size)
+
+    def draw_text(text, x, y_pos, bold=False, size=font_size):
+        set_body_font(bold=bold, size=size)
+        c.drawString(x, y_pos, text)
+        return x + stringWidth(text, "Helvetica-Bold" if bold else "Helvetica", size)
+
+    def dotted_line(x1, x2, y_pos):
+        if x2 <= x1:
+            return
+        c.saveState()
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(0.55)
+        c.setDash(1, 2)
+        c.line(x1, y_pos - 2.0, x2, y_pos - 2.0)
+        c.restoreState()
+
+    def draw_field(x, y_pos, end_x, value="", size=font_size):
+        dotted_line(x, end_x, y_pos)
+        value = str(value or "").strip()
+        if value:
+            available = max(8, end_x - x - 3)
+            draw_size = size
+            while draw_size > 7.0 and stringWidth(value, "Helvetica", draw_size) > available:
+                draw_size -= 0.25
+            set_body_font(size=draw_size)
+            c.drawString(x + 2, y_pos, value)
+        return end_x
+
+    def draw_underlined_centered(text, y_pos, size=9.8):
+        set_body_font(bold=True, size=size)
+        c.drawCentredString(w / 2, y_pos, text)
+        tw = stringWidth(text, "Helvetica-Bold", size)
+        c.line((w - tw) / 2, y_pos - 1.6, (w + tw) / 2, y_pos - 1.6)
 
     cabecalho_path = os.path.join(
         current_app.root_path, "static", "img", "cabecalho_municipio.png"
@@ -3049,38 +3087,83 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
             img_h = 19.6 * mm
             c.drawImage(
                 header_img,
-                margin_x,
+                (w - img_w) / 2,
                 y - img_h,
                 width=img_w,
                 height=img_h,
                 preserveAspectRatio=True,
                 mask="auto",
             )
-            y -= img_h + 8 * mm
+            y -= img_h + 20 * mm
         except Exception:
-            y -= 5 * mm
+            y -= 16 * mm
 
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica-Bold", 11.5)
-    titulo = "DECLARAÇÃO PARA JUSTIFICATIVA DO PONTO ELETRÔNICO-UNIDADES ESCOLARES"
-    for line in _wrap_text_pdf(c, titulo, content_w, "Helvetica-Bold", 11.5):
-        c.drawCentredString(w / 2, y, line)
-        y -= 14
-
-    y -= 8
-
-    intro = (
-        f"Eu {DECLARACAO_PONTO_CHEFIA_NOME} RF {DECLARACAO_PONTO_CHEFIA_RF} "
-        f"cargo/função {DECLARACAO_PONTO_CHEFIA_CARGO} Escola {DECLARACAO_PONTO_ESCOLA} "
-        f"lotado na Secretaria de Educação, autorizo a justificativa do ponto eletrônico "
-        f"referente ao dia {data_dia}, ou (período de {periodo_txt}), no horário das "
-        f"{horario} do(a) servidor(a) {servidor_nome} RF {servidor_rf}, ocupante do "
-        f"cargo/função de {servidor_cargo} em face de:"
+    draw_underlined_centered(
+        "DECLARAÇÃO PARA JUSTIFICATIVA DO PONTO ELETRÔNICO-UNIDADES",
+        y,
+        size=9.8,
     )
-    y = _draw_wrapped_pdf_text(
-        c, intro, margin_x, y, content_w, "Helvetica", 9.4, leading=12
+    y -= 12
+    draw_underlined_centered("ESCOLARES", y, size=9.8)
+    y -= 29
+
+    left = margin_x
+    right = w - margin_x
+
+    x = draw_text("Eu", left, y)
+    x += 4
+    x = draw_field(x, y, left + 96 * mm, DECLARACAO_PONTO_CHEFIA_NOME)
+    x = draw_text("RF", x + 5, y)
+    x = draw_field(x + 4, y, left + 126 * mm, DECLARACAO_PONTO_CHEFIA_RF)
+    x = draw_text("cargo/função", x + 5, y)
+    draw_field(x + 4, y, right, DECLARACAO_PONTO_CHEFIA_CARGO)
+    y -= leading
+
+    x = draw_text("Escola", left, y, bold=True)
+    lotado_w = stringWidth("lotado", "Helvetica", font_size)
+    draw_field(x + 3, y, right - lotado_w - 4, DECLARACAO_PONTO_ESCOLA)
+    draw_text("lotado", right - lotado_w, y)
+    y -= leading
+
+    x = draw_text(
+        "na Secretaria de Educação, autorizo a justificativa do ponto eletrônico referente ao",
+        left,
+        y,
     )
-    y -= 4
+    draw_text("dia", x + 4, y, bold=True)
+    y -= leading
+
+    x = draw_field(left, y, left + 35 * mm, data_dia)
+    x = draw_text(", ou (período de", x + 4, y)
+    x = draw_field(x + 4, y, left + 91 * mm, periodo_ini)
+    x = draw_text("a", x + 5, y)
+    x = draw_field(x + 4, y, left + 125 * mm, periodo_fim)
+    x = draw_text("), no horário das", x + 5, y)
+    draw_field(x + 4, y, right, "")
+    y -= leading
+
+    servidor_phrase = "do     (a)     servidor"
+    servidor_phrase_w = stringWidth(servidor_phrase, "Helvetica", font_size)
+    x = draw_field(left, y, right - servidor_phrase_w - 4, horario)
+    draw_text(servidor_phrase, x + 4, y)
+    y -= leading
+
+    x = draw_text("(a)", left, y)
+    draw_field(x + 4, y, right, servidor_nome)
+    y -= leading
+
+    draw_field(left, y, right, "")
+    y -= leading
+
+    x = draw_text("RF", left, y)
+    x = draw_field(x + 4, y, left + 36 * mm, servidor_rf)
+    x = draw_text(", ocupante do cargo/função de", x + 3, y)
+    x = draw_field(x + 4, y, right - 8 * mm, servidor_cargo)
+    draw_text("em", x + 3, y)
+    y -= leading
+
+    draw_text("face de:", left, y)
+    y -= leading + 1
 
     opcoes = [
         "Falta abonada de acordo com as Leis nº 845/2020 e nº 911/2022.",
@@ -3103,36 +3186,26 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
         "Esquecimento da marcação",
     ]
 
-    c.setFont("Helvetica", 9.1)
-    line_h = 11.2
+    set_body_font(size=8.7)
+    line_h = 10.1
     for opcao in opcoes:
         mark = "( X )" if opcao == motivo_label else "(  )"
-        c.drawString(margin_x, y, f"{mark} {opcao}")
+        c.drawString(left, y, f"{mark} {opcao}")
         y -= line_h
 
-    y -= 5
+    y -= 9
     outros_marcado = motivo_label == "Outros"
     outros_valor = outros_texto if outros_marcado else ""
-    outros_linha = (
-        f"( X ) Outros: {outros_valor} __________________________________________"
-        if outros_marcado
-        else "(  ) Outros: _______________________________________________________"
-    )
-    c.drawString(margin_x, y, outros_linha)
+    x = draw_text("( X ) Outros:" if outros_marcado else "(  ) Outros:", left, y)
+    draw_field(x + 4, y, right - 8 * mm, outros_valor, size=8.7)
 
-    y -= 30
-    c.setFont("Helvetica", 9.4)
-    c.drawString(
-        margin_x,
-        y,
-        "Assinatura do (a) servidor (a):______________________________________________",
-    )
-    y -= 36
-    c.drawString(
-        margin_x,
-        y,
-        "Assinatura da Chefia imediata:_____________________________________________.",
-    )
+    y -= 31
+    x = draw_text("Assinatura do (a) servidor (a):", left, y)
+    draw_field(x + 2, y, right, "", size=font_size)
+    y -= 33
+    x = draw_text("Assinatura da Chefia imediata:", left, y)
+    draw_field(x + 2, y, right, "", size=font_size)
+    draw_text(".", right + 1, y)
 
     c.showPage()
     c.save()
