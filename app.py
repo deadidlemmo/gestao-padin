@@ -1271,6 +1271,203 @@ def _clear_notifications(user):
     return marked
 
 
+def _notification_category(kind):
+    kind_norm = (kind or "").strip().lower()
+    if kind_norm.startswith("agendamento_"):
+        return "agendamentos", "Agendamentos"
+    if kind_norm.startswith("banco_horas_"):
+        return "banco_horas", "Banco de Horas"
+    if kind_norm.startswith("tre_"):
+        return "tre", "TRE"
+    if kind_norm in ("event", "release"):
+        return kind_norm, "Sistema"
+    return "sistema", "Sistema"
+
+
+def _notification_kind_label(kind):
+    labels = {
+        "agendamento_criado": "Agendamento criado",
+        "agendamento_pendente": "Agendamento pendente",
+        "agendamento_deferido": "Agendamento deferido",
+        "agendamento_indeferido": "Agendamento indeferido",
+        "banco_horas_criado": "Banco de Horas cadastrado",
+        "banco_horas_pendente": "Banco de Horas pendente",
+        "banco_horas_deferido": "Banco de Horas deferido",
+        "banco_horas_indeferido": "Banco de Horas indeferido",
+        "tre_criada": "TRE enviada",
+        "tre_pendente": "TRE pendente",
+        "tre_deferida": "TRE deferida",
+        "tre_indeferida": "TRE indeferida",
+        "tre_ajuste_admin": "Ajuste de TRE",
+        "system": "Sistema",
+        "admin_alert": "Alerta administrativo",
+    }
+    kind_norm = (kind or "system").strip().lower()
+    return labels.get(kind_norm, kind_norm.replace("_", " ").title())
+
+
+def _safe_notifications_next(default_endpoint="notifications_page"):
+    default_url = url_for(default_endpoint)
+    next_url = (
+        request.form.get("next")
+        or request.args.get("next")
+        or request.referrer
+        or default_url
+    )
+    next_url = str(next_url or "").strip()
+    if next_url.startswith("/") and not next_url.startswith("//"):
+        return next_url
+    return default_url
+
+
+def _notification_to_view(note):
+    category, category_label = _notification_category(note.kind)
+    return {
+        "id": note.id,
+        "title": note.title or "Notificacao",
+        "body": note.body or "",
+        "level": note.level or "info",
+        "url": note.url or "",
+        "kind": note.kind or "system",
+        "kind_label": _notification_kind_label(note.kind),
+        "category": category,
+        "category_label": category_label,
+        "is_read": bool(note.is_read),
+        "is_cleared": bool(note.is_cleared),
+        "created_at": note.created_at,
+        "created_at_label": _fmt_notif_date(note.created_at),
+        "read_at_label": _fmt_notif_date(note.read_at),
+        "cleared_at_label": _fmt_notif_date(note.cleared_at),
+    }
+
+
+@app.route("/notifications", methods=["GET"])
+@login_required
+def notifications_page():
+    status = (request.args.get("status") or "all").strip().lower()
+    tipo = (request.args.get("tipo") or "todos").strip().lower()
+    level = (request.args.get("level") or "todos").strip().lower()
+    busca = (request.args.get("q") or "").strip()
+    page = request.args.get("page", default=1, type=int) or 1
+    if page < 1:
+        page = 1
+
+    status_options = {
+        "all": "Todas",
+        "unread": "Nao lidas",
+        "read": "Lidas",
+        "archived": "Arquivadas",
+    }
+    tipo_options = {
+        "todos": "Todos os tipos",
+        "agendamentos": "Agendamentos",
+        "banco_horas": "Banco de Horas",
+        "tre": "TRE",
+        "sistema": "Sistema",
+    }
+    level_options = {
+        "todos": "Todos os niveis",
+        "info": "Informativas",
+        "success": "Deferidas",
+        "warning": "Pendentes",
+        "danger": "Indeferidas",
+    }
+
+    if status not in status_options:
+        status = "all"
+    if tipo not in tipo_options:
+        tipo = "todos"
+    if level not in level_options:
+        level = "todos"
+
+    table_available = _app_notifications_table_available()
+    if not table_available:
+        return render_template(
+            "notifications.html",
+            table_available=False,
+            notes=[],
+            pagination=None,
+            stats={"total": 0, "unread": 0, "read": 0, "archived": 0},
+            status=status,
+            tipo=tipo,
+            level=level,
+            busca=busca,
+            status_options=status_options,
+            tipo_options=tipo_options,
+            level_options=level_options,
+        )
+
+    base_q = AppNotification.query.filter(AppNotification.user_id == current_user.id)
+
+    stats = {
+        "total": base_q.count(),
+        "unread": base_q.filter(AppNotification.is_read.is_(False)).count(),
+        "read": base_q.filter(
+            AppNotification.is_read.is_(True),
+            AppNotification.is_cleared.is_(False),
+        ).count(),
+        "archived": base_q.filter(AppNotification.is_cleared.is_(True)).count(),
+    }
+
+    q = base_q
+    if status == "unread":
+        q = q.filter(AppNotification.is_read.is_(False))
+    elif status == "read":
+        q = q.filter(
+            AppNotification.is_read.is_(True),
+            AppNotification.is_cleared.is_(False),
+        )
+    elif status == "archived":
+        q = q.filter(AppNotification.is_cleared.is_(True))
+
+    if tipo == "agendamentos":
+        q = q.filter(AppNotification.kind.ilike("agendamento_%"))
+    elif tipo == "banco_horas":
+        q = q.filter(AppNotification.kind.ilike("banco_horas_%"))
+    elif tipo == "tre":
+        q = q.filter(AppNotification.kind.ilike("tre_%"))
+    elif tipo == "sistema":
+        q = q.filter(
+            ~AppNotification.kind.ilike("agendamento_%"),
+            ~AppNotification.kind.ilike("banco_horas_%"),
+            ~AppNotification.kind.ilike("tre_%"),
+        )
+
+    if level != "todos":
+        q = q.filter(AppNotification.level == level)
+
+    if busca:
+        like = f"%{busca}%"
+        q = q.filter(
+            or_(
+                AppNotification.title.ilike(like),
+                AppNotification.body.ilike(like),
+                AppNotification.kind.ilike(like),
+            )
+        )
+
+    pagination = q.order_by(
+        AppNotification.created_at.desc(), AppNotification.id.desc()
+    ).paginate(page=page, per_page=12, error_out=False)
+
+    notes = [_notification_to_view(note) for note in pagination.items]
+
+    return render_template(
+        "notifications.html",
+        table_available=True,
+        notes=notes,
+        pagination=pagination,
+        stats=stats,
+        status=status,
+        tipo=tipo,
+        level=level,
+        busca=busca,
+        status_options=status_options,
+        tipo_options=tipo_options,
+        level_options=level_options,
+    )
+
+
 @app.route("/notifications/mark_all_read", methods=["POST"])
 @login_required
 def notifications_mark_all_read():
@@ -1298,6 +1495,69 @@ def notifications_clear():
 # ===========================================
 # E-MAIL — Função genérica (corrigida e robusta)
 # ===========================================
+@app.route("/notifications/<int:notification_id>/read", methods=["POST"])
+@login_required
+def notification_mark_read(notification_id):
+    if not _app_notifications_table_available():
+        flash("Notificacoes ainda nao estao disponiveis.", "warning")
+        return redirect(url_for("notifications_page"))
+
+    note = AppNotification.query.filter_by(
+        id=notification_id, user_id=current_user.id
+    ).first_or_404()
+
+    try:
+        if not note.is_read:
+            note.is_read = True
+            note.read_at = datetime.datetime.utcnow()
+            db.session.commit()
+
+        next_url = _safe_notifications_next()
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": True, "next": next_url})
+        return redirect(next_url)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception(
+            "Falha ao marcar notificacao %s como lida.", notification_id
+        )
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False}), 500
+        flash("Nao foi possivel atualizar a notificacao.", "danger")
+        return redirect(url_for("notifications_page"))
+
+
+@app.route("/notifications/<int:notification_id>/archive", methods=["POST"])
+@login_required
+def notification_archive(notification_id):
+    if not _app_notifications_table_available():
+        flash("Notificacoes ainda nao estao disponiveis.", "warning")
+        return redirect(url_for("notifications_page"))
+
+    note = AppNotification.query.filter_by(
+        id=notification_id, user_id=current_user.id
+    ).first_or_404()
+
+    try:
+        now = datetime.datetime.utcnow()
+        note.is_read = True
+        note.read_at = note.read_at or now
+        note.is_cleared = True
+        note.cleared_at = now
+        db.session.commit()
+
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": True})
+        return redirect(_safe_notifications_next())
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao arquivar notificacao %s.", notification_id)
+        if request.headers.get("X-Requested-With") == "XMLHttpRequest":
+            return jsonify({"ok": False}), 500
+        flash("Nao foi possivel arquivar a notificacao.", "danger")
+        return redirect(url_for("notifications_page"))
+
+
 def enviar_email(destinatario, assunto, mensagem_html, mensagem_texto=None):
     """
     Envia um e-mail via Gmail:
