@@ -89,7 +89,14 @@
     .status-pill.deferido{ background:#d1fae5; color:#065f46; }
     .status-pill.indeferido{ background:#fee2e2; color:#991b1b; }
 
-    /* Protocolo (PDF) */
+    /* Documentos (PDF) */
+    .doc-links{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      flex-wrap:wrap;
+    }
     .proto-link{
       display:inline-flex; align-items:center; justify-content:center; gap:6px;
       padding:6px 10px;
@@ -105,6 +112,16 @@
     }
     .proto-link i{ font-size:14px; }
     .proto-link:hover{ background:#dbeafe; border-color:#bfdbfe; color:#1e40af; }
+    .proto-link.declaration-link{
+      border-color:#bbf7d0;
+      background:#ecfdf5;
+      color:#047857;
+    }
+    .proto-link.declaration-link:hover{
+      background:#d1fae5;
+      border-color:#86efac;
+      color:#065f46;
+    }
 
     /* Ações */
     .delete-btn{ font-size:1.1rem; color:#e74c3c; cursor:pointer; background:none; border:none; padding:0; margin:0; line-height:1; display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; border-radius:50%; transition:.2s; }
@@ -395,7 +412,7 @@
                   <th>Motivo</th>
                   <th>Status</th>
                   <th>Substituição</th>
-                  <th>Protocolo</th>
+                  <th>Documentos</th>
                   <th>Opções</th>
                 </tr>
               </thead>
@@ -456,16 +473,28 @@
                     </div>
                   </td>
 
-                  <!-- Protocolo PDF -->
+                  <!-- Documentos PDF -->
                   <td>
-                    <a class="proto-link"
-                       href="{{ url_for('agendamento_protocolo', agendamento_id=ag.id) }}"
-                       target="_blank"
-                       rel="noopener"
-                       title="Abrir protocolo em PDF">
-                      <i class="fas fa-file-pdf" aria-hidden="true"></i>
-                      <span>Protocolo</span>
-                    </a>
+                    <div class="doc-links">
+                      <a class="proto-link"
+                         href="{{ url_for('agendamento_protocolo', agendamento_id=ag.id) }}"
+                         target="_blank"
+                         rel="noopener"
+                         title="Abrir protocolo em PDF">
+                        <i class="fas fa-file-pdf" aria-hidden="true"></i>
+                        <span>Protocolo</span>
+                      </a>
+                      {% if s == 'deferido' %}
+                        <a class="proto-link declaration-link"
+                           href="{{ url_for('agendamento_declaracao_ponto', agendamento_id=ag.id) }}"
+                           target="_blank"
+                           rel="noopener"
+                           title="Abrir declaração institucional de ponto">
+                          <i class="fas fa-file-signature" aria-hidden="true"></i>
+                          <span>Declaração</span>
+                        </a>
+                      {% endif %}
+                    </div>
                   </td>
 
                   <td>

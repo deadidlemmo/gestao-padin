@@ -2520,6 +2520,22 @@ def _protocolo_agendamento_abs_path(agendamento_id: int) -> str:
     return str(pasta / f"protocolo_agendamento_{agendamento_id}.pdf")
 
 
+def _declaracao_ponto_abs_path(agendamento_id: int) -> str:
+    """
+    Caminho absoluto da declaracao institucional de ponto.
+    Nao altera banco: apenas garante a pasta e sobrescreve o PDF gerado.
+    """
+    base = (current_app.config.get("UPLOAD_FOLDER") or "uploads").strip()
+
+    if not os.path.isabs(base):
+        base = os.path.join(current_app.root_path, base)
+
+    pasta = Path(base) / "protocolos" / "declaracoes_ponto"
+    pasta.mkdir(parents=True, exist_ok=True)
+
+    return str(pasta / f"declaracao_ponto_{agendamento_id}.pdf")
+
+
 def _clamp_radius(w, h, r):
     # garante que o raio nunca “exploda” o path
     try:
@@ -2834,6 +2850,295 @@ def gerar_protocolo_agendamento_pdf(agendamento, usuario) -> str:
     return pdf_path
 
 
+DECLARACAO_PONTO_CHEFIA_NOME = "Luciana Rocha Augustinho"
+DECLARACAO_PONTO_CHEFIA_RF = "28045"
+DECLARACAO_PONTO_CHEFIA_CARGO = "Diretor de Unidade Escolar"
+DECLARACAO_PONTO_ESCOLA = "E.M José Padin Mouta"
+
+
+def _fmt_data_declaracao(dt):
+    if not dt:
+        return "......../......../20......"
+    return dt.strftime("%d/%m/%Y")
+
+
+def _wrap_text_pdf(c, text, max_width, font_name="Helvetica", font_size=9.4):
+    from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    words = str(text or "").split()
+    if not words:
+        return [""]
+
+    lines = []
+    line = ""
+    for word in words:
+        candidate = word if not line else f"{line} {word}"
+        if stringWidth(candidate, font_name, font_size) <= max_width:
+            line = candidate
+        else:
+            if line:
+                lines.append(line)
+            line = word
+    if line:
+        lines.append(line)
+    return lines
+
+
+def _draw_wrapped_pdf_text(
+    c,
+    text,
+    x,
+    y,
+    max_width,
+    font_name="Helvetica",
+    font_size=9.4,
+    leading=12,
+):
+    c.setFont(font_name, font_size)
+    for line in _wrap_text_pdf(c, text, max_width, font_name, font_size):
+        c.drawString(x, y, line)
+        y -= leading
+    return y
+
+
+def _periodo_declaracao_agendamento(agendamento):
+    dt_ini = getattr(agendamento, "data", None)
+    dt_fim = getattr(agendamento, "data_fim", None) or dt_ini
+    lote_id = getattr(agendamento, "lote_id", None)
+
+    if lote_id:
+        try:
+            regs = (
+                Agendamento.query.filter(
+                    Agendamento.funcionario_id == agendamento.funcionario_id,
+                    Agendamento.lote_id == lote_id,
+                    func.upper(Agendamento.motivo) == "LM",
+                )
+                .order_by(Agendamento.data.asc())
+                .all()
+            )
+            datas_ini = [r.data for r in regs if getattr(r, "data", None)]
+            datas_fim = [
+                (getattr(r, "data_fim", None) or getattr(r, "data", None))
+                for r in regs
+                if getattr(r, "data", None)
+            ]
+            if datas_ini:
+                dt_ini = min(datas_ini)
+            if datas_fim:
+                dt_fim = max(datas_fim)
+        except Exception:
+            current_app.logger.exception(
+                "Falha ao calcular periodo da declaracao do agendamento %s",
+                getattr(agendamento, "id", None),
+            )
+
+    return dt_ini, dt_fim
+
+
+def _horario_declaracao_usuario(usuario, data_ref):
+    if not usuario or not data_ref:
+        return "..........................................................................................................."
+
+    try:
+        horarios = (
+            UserHorarioTrabalho.query.filter(
+                UserHorarioTrabalho.user_id == usuario.id,
+                UserHorarioTrabalho.ativo.is_(True),
+                UserHorarioTrabalho.dia_semana == data_ref.weekday(),
+                UserHorarioTrabalho.vigencia_inicio <= data_ref,
+                or_(
+                    UserHorarioTrabalho.vigencia_fim.is_(None),
+                    UserHorarioTrabalho.vigencia_fim >= data_ref,
+                ),
+            )
+            .order_by(
+                UserHorarioTrabalho.vigencia_inicio.desc(),
+                UserHorarioTrabalho.hora_inicio.asc(),
+            )
+            .all()
+        )
+    except Exception:
+        current_app.logger.exception(
+            "Falha ao buscar horario da declaracao do usuario %s",
+            getattr(usuario, "id", None),
+        )
+        horarios = []
+
+    if not horarios:
+        return "..........................................................................................................."
+
+    partes = []
+    for h in horarios:
+        inicio = h.hora_inicio.strftime("%H:%M")
+        fim = h.hora_fim.strftime("%H:%M")
+        trecho = f"{inicio} às {fim}"
+        if trecho not in partes:
+            partes.append(trecho)
+    return " e ".join(partes)
+
+
+def _motivo_declaracao_ponto(agendamento):
+    motivo = (
+        getattr(agendamento, "motivo", None)
+        or getattr(agendamento, "tipo_folga", None)
+        or ""
+    ).strip().upper()
+
+    mapa = {
+        "AB": "Falta abonada de acordo com as Leis nº 845/2020 e nº 911/2022.",
+        "BH": "Compensação de Banco de horas, conforme LC nº 851/2020",
+        "TRE": "Folga T.R.E, conforme comprovação do cartório eleitoral",
+        "LM": "Declaração médica, conforme documento apresentado",
+        "DS": "Doação de sangue, conforme documento",
+    }
+    if motivo in mapa:
+        return motivo, mapa[motivo], ""
+
+    outros = _motivo_legivel(motivo)
+    return motivo, "Outros", outros
+
+
+def _is_agendamento_deferido(agendamento) -> bool:
+    status = (getattr(agendamento, "status", "") or "").strip().lower()
+    return status.startswith("deferid")
+
+
+def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
+    """
+    Gera a declaracao institucional para justificativa do ponto eletronico.
+    Deve ser usada somente para agendamentos deferidos.
+    """
+    if not _is_agendamento_deferido(agendamento):
+        raise ValueError("Declaracao de ponto disponivel apenas para deferidos.")
+
+    pdf_path = _declaracao_ponto_abs_path(agendamento.id)
+    dt_ini, dt_fim = _periodo_declaracao_agendamento(agendamento)
+    periodo = bool(dt_ini and dt_fim and dt_fim != dt_ini)
+    data_dia = "......../......../20......" if periodo else _fmt_data_declaracao(dt_ini)
+    periodo_txt = (
+        f"{_fmt_data_declaracao(dt_ini)} a {_fmt_data_declaracao(dt_fim)}"
+        if periodo
+        else "......./....../20....... a ......../......./20......"
+    )
+    horario = _horario_declaracao_usuario(usuario, dt_ini)
+    servidor_nome = getattr(usuario, "nome", "") or "................................................................"
+    servidor_rf = getattr(usuario, "registro", "") or ".............."
+    servidor_cargo = getattr(usuario, "cargo", "") or "........................................................"
+    _, motivo_label, outros_texto = _motivo_declaracao_ponto(agendamento)
+
+    c = canvas.Canvas(pdf_path, pagesize=A4)
+    c.setTitle("Declaração para Justificativa do Ponto Eletrônico")
+    c.setAuthor(DECLARACAO_PONTO_ESCOLA)
+
+    w, h = A4
+    margin_x = 18 * mm
+    y = h - 18 * mm
+    content_w = w - (2 * margin_x)
+
+    c.setFillColor(colors.white)
+    c.rect(0, 0, w, h, stroke=0, fill=1)
+
+    cabecalho_path = os.path.join(
+        current_app.root_path, "static", "img", "cabecalho_municipio.png"
+    )
+    if os.path.exists(cabecalho_path):
+        try:
+            header_img = ImageReader(cabecalho_path)
+            img_w = 145 * mm
+            img_h = 19.6 * mm
+            c.drawImage(
+                header_img,
+                margin_x,
+                y - img_h,
+                width=img_w,
+                height=img_h,
+                preserveAspectRatio=True,
+                mask="auto",
+            )
+            y -= img_h + 8 * mm
+        except Exception:
+            y -= 5 * mm
+
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica-Bold", 11.5)
+    titulo = "DECLARAÇÃO PARA JUSTIFICATIVA DO PONTO ELETRÔNICO-UNIDADES ESCOLARES"
+    for line in _wrap_text_pdf(c, titulo, content_w, "Helvetica-Bold", 11.5):
+        c.drawCentredString(w / 2, y, line)
+        y -= 14
+
+    y -= 8
+
+    intro = (
+        f"Eu {DECLARACAO_PONTO_CHEFIA_NOME} RF {DECLARACAO_PONTO_CHEFIA_RF} "
+        f"cargo/função {DECLARACAO_PONTO_CHEFIA_CARGO} Escola {DECLARACAO_PONTO_ESCOLA} "
+        f"lotado na Secretaria de Educação, autorizo a justificativa do ponto eletrônico "
+        f"referente ao dia {data_dia}, ou (período de {periodo_txt}), no horário das "
+        f"{horario} do(a) servidor(a) {servidor_nome} RF {servidor_rf}, ocupante do "
+        f"cargo/função de {servidor_cargo} em face de:"
+    )
+    y = _draw_wrapped_pdf_text(
+        c, intro, margin_x, y, content_w, "Helvetica", 9.4, leading=12
+    )
+    y -= 4
+
+    opcoes = [
+        "Falta abonada de acordo com as Leis nº 845/2020 e nº 911/2022.",
+        "Compensação de Banco de horas, conforme LC nº 851/2020",
+        "Folga T.R.E, conforme comprovação do cartório eleitoral",
+        "Declaração médica, conforme documento apresentado",
+        "Doação de sangue, conforme documento",
+        "Convocação para reunião de equipe/servidores/pais",
+        "Capacitação/treinamento",
+        "Atendimento a pais/alunos",
+        "Visitas/ passeios/campeonatos e etc.",
+        "Dispensa para Pós-graduação/Mestrado/Doutorado",
+        "Servidor emprestado",
+        "Redução de carga horária",
+        "Malote",
+        "Transporte de alunos/assistidos",
+        "Troca de horário por necessidade do setor",
+        "Atrasos em face de problema no percurso",
+        "Instabilidade na rede/manutenção no ponto",
+        "Esquecimento da marcação",
+    ]
+
+    c.setFont("Helvetica", 9.1)
+    line_h = 11.2
+    for opcao in opcoes:
+        mark = "( X )" if opcao == motivo_label else "(  )"
+        c.drawString(margin_x, y, f"{mark} {opcao}")
+        y -= line_h
+
+    y -= 5
+    outros_marcado = motivo_label == "Outros"
+    outros_valor = outros_texto if outros_marcado else ""
+    outros_linha = (
+        f"( X ) Outros: {outros_valor} __________________________________________"
+        if outros_marcado
+        else "(  ) Outros: _______________________________________________________"
+    )
+    c.drawString(margin_x, y, outros_linha)
+
+    y -= 30
+    c.setFont("Helvetica", 9.4)
+    c.drawString(
+        margin_x,
+        y,
+        "Assinatura do (a) servidor (a):______________________________________________",
+    )
+    y -= 36
+    c.drawString(
+        margin_x,
+        y,
+        "Assinatura da Chefia imediata:_____________________________________________.",
+    )
+
+    c.showPage()
+    c.save()
+    return pdf_path
+
+
 import os
 
 from flask import abort, current_app, send_file
@@ -2875,6 +3180,41 @@ def agendamento_protocolo(agendamento_id):
     )
 
     # Evita cache (pra não abrir “versão antiga” do PDF)
+    resp.headers["Cache-Control"] = "no-store, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/agendamentos/<int:agendamento_id>/declaracao-ponto", methods=["GET"])
+@login_required
+def agendamento_declaracao_ponto(agendamento_id):
+    ag = Agendamento.query.get_or_404(agendamento_id)
+
+    if current_user.tipo != "administrador" and ag.funcionario_id != current_user.id:
+        abort(403)
+
+    if not _is_agendamento_deferido(ag):
+        abort(404)
+
+    usuario = User.query.get(ag.funcionario_id)
+    if not usuario:
+        abort(404)
+
+    try:
+        pdf_path = gerar_declaracao_ponto_pdf(ag, usuario)
+    except Exception:
+        current_app.logger.exception(
+            "Erro ao gerar declaracao de ponto do agendamento %s", agendamento_id
+        )
+        abort(500)
+
+    resp = send_file(
+        pdf_path,
+        mimetype="application/pdf",
+        as_attachment=False,
+        download_name=os.path.basename(pdf_path),
+        conditional=True,
+    )
     resp.headers["Cache-Control"] = "no-store, max-age=0"
     resp.headers["Pragma"] = "no-cache"
     return resp
@@ -3928,6 +4268,18 @@ def admin_agendar_para():
                 )
                 flash(
                     "Agendamento deferido e registrado, mas não foi possível gerar o protocolo em PDF neste momento.",
+                    "warning",
+                )
+
+            try:
+                gerar_declaracao_ponto_pdf(primeiro, usuario_alvo)
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao gerar declaracao de ponto do agendamento %s",
+                    getattr(primeiro, "id", None),
+                )
+                flash(
+                    "Agendamento deferido e registrado, mas não foi possível gerar a declaração de ponto em PDF.",
                     "warning",
                 )
 
@@ -5313,6 +5665,19 @@ def deferir_folgas():
                     "Status atualizado, mas não foi possível atualizar o protocolo em PDF.",
                     "warning",
                 )
+
+            if novo_status == "deferido":
+                try:
+                    gerar_declaracao_ponto_pdf(folga_principal, usuario)
+                except Exception:
+                    current_app.logger.exception(
+                        "Falha ao gerar declaracao de ponto do agendamento %s",
+                        folga_principal.id,
+                    )
+                    flash(
+                        "Status deferido, mas não foi possível gerar a declaração de ponto em PDF.",
+                        "warning",
+                    )
 
             # TRE sync (mantém como era; lote não é TRE)
             if not lote_regs and folga.motivo == "TRE":
