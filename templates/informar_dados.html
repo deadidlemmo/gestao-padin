@@ -177,6 +177,16 @@
     input:focus, select:focus {
       border-color: #93c5fd; box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
     }
+    .checkbox-field {
+      display: flex; flex-direction: column; gap: 6px; border: 1px solid #bfdbfe;
+      background: #eff6ff; border-radius: 12px; padding: 12px;
+    }
+    .checkbox-field .checkbox-row { display: flex; align-items: flex-start; gap: 10px; }
+    .checkbox-field input[type="checkbox"] {
+      width: 18px; height: 18px; margin-top: 1px; accent-color: #0d6efd; flex-shrink: 0;
+    }
+    .checkbox-field label { margin: 0; line-height: 1.35; }
+    .checkbox-note { color: var(--text-muted); font-size: 0.82rem; line-height: 1.35; margin-left: 28px; }
     button {
       background-color: #0fb300; color: white; font-weight: 800; cursor: pointer; border: none;
       box-shadow: 0 4px 12px rgba(15,179,0,0.45); transition: background-color .18s, transform .1s, box-shadow .18s;
@@ -309,6 +319,21 @@
               required
               maxlength="15"
             >
+          </div>
+
+          <div class="field full-row checkbox-field">
+            <div class="checkbox-row">
+              <input
+                type="checkbox"
+                id="whatsapp_opt_in"
+                name="whatsapp_opt_in"
+                {% if usuario.whatsapp_opt_in %}checked{% endif %}
+              >
+              <label for="whatsapp_opt_in">Receber avisos pelo WhatsApp</label>
+            </div>
+            <div class="checkbox-note">
+              As mensagens serao apenas avisos genericos para consultar o Portal do Servidor. Os detalhes permanecem dentro do sistema.
+            </div>
           </div>
 
           <!-- Cargo -->

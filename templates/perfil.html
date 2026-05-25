@@ -331,6 +331,35 @@
       margin-top:6px;
       line-height:1.35;
     }
+    .whatsapp-consent{
+      grid-column:1 / -1;
+      border:1px solid #bfdbfe;
+      background:#eff6ff;
+      border-radius:14px;
+      padding:12px 14px;
+      gap:8px;
+    }
+    .whatsapp-consent-row{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .whatsapp-consent input[type="checkbox"]{
+      width:18px;
+      height:18px;
+      margin-top:2px;
+      accent-color:#0d6efd;
+      flex-shrink:0;
+    }
+    .whatsapp-consent label{
+      margin:0;
+      color:#111827;
+      line-height:1.35;
+    }
+    .whatsapp-consent .mini-note{
+      margin:0 0 0 28px;
+      color:#475569;
+    }
 
     footer{ background:linear-gradient(to right,#222,#444); color:#ddd; text-align:center; padding:15px 0; font-size:14px; border-top:2px solid #555; box-shadow:0px -2px 10px rgba(0,0,0,0.3); width:100%; flex-shrink:0; }
     footer p{ margin:5px 0; font-size:0.9rem; }
@@ -439,6 +468,23 @@
                 <button type="button" class="edit-icon" onclick="toggleEdit('celular', this)" aria-label="Editar celular" title="Editar">
                   <i class="fas fa-pen"></i>
                 </button>
+              </div>
+            </div>
+
+            <div class="editable-field whatsapp-consent">
+              <div class="whatsapp-consent-row">
+                <input
+                  type="checkbox"
+                  id="whatsapp_opt_in"
+                  name="whatsapp_opt_in"
+                  {% if usuario.whatsapp_opt_in %}checked{% endif %}
+                >
+                <label for="whatsapp_opt_in">
+                  Receber avisos pelo WhatsApp
+                </label>
+              </div>
+              <div class="mini-note">
+                As mensagens pelo WhatsApp serao apenas avisos genericos para consultar o Portal do Servidor. Os detalhes continuam dentro do sistema.
               </div>
             </div>
 

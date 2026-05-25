@@ -361,6 +361,36 @@
 
     label i{ color: var(--brand); }
 
+    .checkbox-field{
+      border:1px solid #bfdbfe;
+      background:#eff6ff;
+      border-radius:14px;
+      padding:12px 14px;
+      gap:8px;
+    }
+    .checkbox-row{
+      display:flex;
+      align-items:flex-start;
+      gap:10px;
+    }
+    .checkbox-row input[type="checkbox"]{
+      width:18px;
+      height:18px;
+      margin-top:2px;
+      accent-color:var(--brand);
+      flex-shrink:0;
+    }
+    .checkbox-row label{
+      margin:0;
+      line-height:1.35;
+    }
+    .checkbox-note{
+      margin:0 0 0 28px;
+      color:var(--muted);
+      font-size:0.82rem;
+      line-height:1.35;
+    }
+
     .input-wrap{
       position:relative;
       min-width:0;
@@ -705,6 +735,18 @@
               <input type="text" id="celular" name="celular" required placeholder="(00) 00000-0000" autocomplete="tel" />
             </div>
             <div id="celular-error" class="error-message"></div>
+          </div>
+
+          <div class="form-group full-width checkbox-field">
+            <div class="checkbox-row">
+              <input type="checkbox" id="whatsapp_opt_in" name="whatsapp_opt_in">
+              <label for="whatsapp_opt_in">
+                Receber avisos pelo WhatsApp
+              </label>
+            </div>
+            <div class="checkbox-note">
+              As mensagens serao apenas avisos genericos para consultar o Portal do Servidor. Os detalhes permanecem dentro do sistema.
+            </div>
           </div>
 
           <div class="form-group full-width">

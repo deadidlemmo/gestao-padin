@@ -475,6 +475,8 @@ class User(UserMixin, db.Model):
     banco_horas = db.Column(db.Integer, default=0, nullable=False)
 
     celular = db.Column(db.String(20), nullable=True)
+    whatsapp_opt_in = db.Column(db.Boolean, nullable=False, default=False)
+    whatsapp_opt_in_at = db.Column(db.DateTime, nullable=True)
     data_nascimento = db.Column(db.Date, nullable=True)
 
     cpf = db.Column(db.String(14), nullable=False, unique=True, index=True)
@@ -1693,6 +1695,9 @@ def enviar_email(destinatario, assunto, mensagem_html, mensagem_texto=None):
 #   BOTBOT_AUTH_KEY
 #   BOTBOT_SEND_TEXT_URL=https://botbot.chat/api/v2/sendText
 #   BOTBOT_ENABLED=true
+#   BOTBOT_REQUIRE_OPT_IN=true
+#   BOTBOT_GENERIC_MESSAGES=true
+#   BOTBOT_PORTAL_URL=https://seu-sistema.onrender.com
 BOTBOT_SEND_TEXT_URL = os.getenv(
     "BOTBOT_SEND_TEXT_URL",
     "https://botbot.chat/api/v2/sendText",
@@ -1700,6 +1705,9 @@ BOTBOT_SEND_TEXT_URL = os.getenv(
 BOTBOT_APP_KEY = os.getenv("BOTBOT_APP_KEY", "").strip()
 BOTBOT_AUTH_KEY = os.getenv("BOTBOT_AUTH_KEY", "").strip()
 BOTBOT_ENABLED = _is_truthy(os.getenv("BOTBOT_ENABLED", "true"))
+BOTBOT_REQUIRE_OPT_IN = _is_truthy(os.getenv("BOTBOT_REQUIRE_OPT_IN", "true"))
+BOTBOT_GENERIC_MESSAGES = _is_truthy(os.getenv("BOTBOT_GENERIC_MESSAGES", "true"))
+BOTBOT_PORTAL_URL = os.getenv("BOTBOT_PORTAL_URL", "").strip()
 
 
 def normalizar_celular_botbot(celular):
@@ -1732,6 +1740,23 @@ def normalizar_celular_botbot(celular):
     return None
 
 
+def montar_mensagem_botbot_generica(usuario):
+    nome = (getattr(usuario, "nome", None) or "").strip()
+    primeiro_nome = nome.split()[0] if nome else "servidor(a)"
+
+    texto = (
+        f"Olá, {primeiro_nome}.\n\n"
+        "Há uma atualização sobre uma solicitação sua no Portal do Servidor.\n"
+        "Acesse o sistema para consultar os detalhes com segurança."
+    )
+
+    if BOTBOT_PORTAL_URL:
+        texto += f"\n\nPortal: {BOTBOT_PORTAL_URL}"
+
+    texto += "\n\n_Mensagem automática do Portal do Servidor._"
+    return texto
+
+
 def enviar_botbot_texto(usuario, mensagem):
     """
     Envia uma mensagem de texto via BotBot.
@@ -1742,6 +1767,13 @@ def enviar_botbot_texto(usuario, mensagem):
       - Usa o campo User.celular como destinatário.
     """
     if not BOTBOT_ENABLED:
+        return False
+
+    if BOTBOT_REQUIRE_OPT_IN and not bool(getattr(usuario, "whatsapp_opt_in", False)):
+        current_app.logger.info(
+            "BotBot não enviado: usuário %s sem aceite para WhatsApp.",
+            getattr(usuario, "id", None),
+        )
         return False
 
     telefone = normalizar_celular_botbot(getattr(usuario, "celular", None))
@@ -1762,6 +1794,8 @@ def enviar_botbot_texto(usuario, mensagem):
     if not texto:
         current_app.logger.warning("BotBot não enviado: mensagem vazia.")
         return False
+    if BOTBOT_GENERIC_MESSAGES:
+        texto = montar_mensagem_botbot_generica(usuario)
 
     payload = {
         "to": telefone,
@@ -4943,6 +4977,13 @@ def informar_dados():
             if valor:
                 setattr(usuario, campo, valor)
 
+        whatsapp_opt_in_novo = request.form.get("whatsapp_opt_in") == "on"
+        if usuario.whatsapp_opt_in != whatsapp_opt_in_novo:
+            usuario.whatsapp_opt_in = whatsapp_opt_in_novo
+            usuario.whatsapp_opt_in_at = (
+                datetime.datetime.utcnow() if whatsapp_opt_in_novo else None
+            )
+
         if campos_atualizar["cargo"]:
             cargos_validos = [
                 "Agente Administrativo",
@@ -4999,6 +5040,7 @@ def register():
         data_nascimento = request.form["data_nascimento"]
         celular = request.form["celular"]
         cargo = request.form["cargo"]
+        whatsapp_opt_in = request.form.get("whatsapp_opt_in") == "on"
 
         if senha != confirmar_senha:
             flash("As senhas não coincidem", "danger")
@@ -5044,6 +5086,8 @@ def register():
             rg=rg,
             data_nascimento=data_nascimento,
             celular=celular,
+            whatsapp_opt_in=whatsapp_opt_in,
+            whatsapp_opt_in_at=datetime.datetime.utcnow() if whatsapp_opt_in else None,
             cargo=cargo,
         )
 
@@ -7723,6 +7767,14 @@ def perfil():
             celular_novo = (request.form.get("celular") or "").strip() or None
             if usuario.celular != celular_novo:
                 usuario.celular = celular_novo
+                perfil_alterado = True
+
+            whatsapp_opt_in_novo = request.form.get("whatsapp_opt_in") == "on"
+            if usuario.whatsapp_opt_in != whatsapp_opt_in_novo:
+                usuario.whatsapp_opt_in = whatsapp_opt_in_novo
+                usuario.whatsapp_opt_in_at = (
+                    datetime.datetime.utcnow() if whatsapp_opt_in_novo else None
+                )
                 perfil_alterado = True
 
             # data_nascimento
