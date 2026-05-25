@@ -44,12 +44,23 @@
                {% if not _url %}onclick="event.preventDefault()"{% endif %}>
               <span class="gp-dot gp-dot--{{ _level }}"></span>
               <span class="gp-notif__txt">
-                <span class="gp-notif__title">{{ n.title|default('Notificacao', true) }}</span>
+                <span class="gp-notif__topline">
+                  <span class="gp-notif__title">{{ n.title|default('Notificacao', true) }}</span>
+                  {% if not _read %}
+                    <span class="gp-notif__state">Nova</span>
+                  {% endif %}
+                </span>
                 {% if n.body %}
                   <span class="gp-notif__body">{{ n.body }}</span>
                 {% endif %}
                 {% if n.created_at %}
-                  <span class="gp-notif__time">{{ n.created_at }}</span>
+                  <span class="gp-notif__time">
+                    <svg class="gp-time-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                      <circle cx="12" cy="12" r="9"></circle>
+                      <path d="M12 7v5l3 2"></path>
+                    </svg>
+                    {{ n.created_at }}
+                  </span>
                 {% endif %}
               </span>
             </a>
@@ -335,28 +346,30 @@
 
   .gp-notif {
     display: flex;
-    gap: 10px;
-    padding: 12px 14px;
+    gap: 11px;
+    padding: 13px 14px;
     text-decoration: none;
     border-bottom: 1px solid rgba(148, 163, 184, .18);
     color: var(--gp-text);
-    transition: background .12s ease;
+    transition: background .12s ease, border-color .12s ease;
+    position: relative;
   }
 
   .gp-notif:hover {
-    background: rgba(0, 0, 0, .03);
+    background: rgba(15, 23, 42, .035);
   }
 
   .gp-notif.is-unread {
-    background: rgba(0, 123, 255, .08);
+    background: linear-gradient(90deg, rgba(0, 123, 255, .09), rgba(255, 255, 255, .98));
   }
 
   .gp-dot {
-    width: 10px;
-    height: 10px;
+    width: 9px;
+    height: 9px;
     border-radius: 999px;
-    margin-top: 5px;
+    margin-top: 7px;
     flex: 0 0 auto;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .10);
   }
 
   .gp-dot--info { background: #2563eb; }
@@ -368,25 +381,71 @@
     min-width: 0;
     display: flex;
     flex-direction: column;
+    gap: 4px;
+  }
+
+  .gp-notif__topline {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    min-width: 0;
   }
 
   .gp-notif__title {
+    color: #111827;
+    font-size: 14px;
     font-weight: 900;
+    line-height: 1.25;
     overflow-wrap: anywhere;
+    text-decoration: none;
+  }
+
+  .gp-notif:hover .gp-notif__title {
+    color: #075ab8;
+  }
+
+  .gp-notif__state {
+    flex: 0 0 auto;
+    border-radius: 999px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    padding: 3px 7px;
+    font-size: 10px;
+    font-weight: 900;
+    line-height: 1;
   }
 
   .gp-notif__body {
-    color: var(--gp-muted);
+    color: #475569;
     font-size: 13px;
-    margin-top: 2px;
-    line-height: 1.25rem;
+    font-weight: 700;
+    line-height: 1.32rem;
     overflow-wrap: anywhere;
+    text-decoration: none;
   }
 
   .gp-notif__time {
-    color: rgba(107, 114, 128, .95);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #64748b;
     font-size: 12px;
-    margin-top: 6px;
+    font-weight: 800;
+    margin-top: 2px;
+    text-decoration: none;
+  }
+
+  .gp-time-icon {
+    width: 13px;
+    height: 13px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: 0 0 auto;
   }
 
   .gp-ghostbtn,

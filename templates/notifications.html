@@ -57,8 +57,15 @@
     flex: 0 0 auto;
   }
 
-  .notif-title-icon i {
-    font-size: 20px;
+  .notif-icon-svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    flex: 0 0 auto;
   }
 
   .notif-title {
@@ -648,7 +655,10 @@
   <div class="notif-top">
     <div class="notif-title-wrap">
       <div class="notif-title-icon" aria-hidden="true">
-        <i class="fa-regular fa-bell"></i>
+        <svg class="notif-icon-svg" viewBox="0 0 24 24" focusable="false">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+        </svg>
       </div>
       <div>
         <h1 class="notif-title" id="notifPageTitle">Notifica&ccedil;&otilde;es</h1>
@@ -751,13 +761,24 @@
         <article class="notif-card level-{{ n.level }} {% if n.is_cleared %}is-archived{% endif %}">
           <div class="notif-card-icon" aria-hidden="true">
             {% if n.level == 'success' %}
-              <i class="fa-solid fa-check"></i>
+              <svg class="notif-icon-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M20 6 9 17l-5-5"></path>
+              </svg>
             {% elif n.level == 'warning' %}
-              <i class="fa-solid fa-clock"></i>
+              <svg class="notif-icon-svg" viewBox="0 0 24 24" focusable="false">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v5l3 2"></path>
+              </svg>
             {% elif n.level == 'danger' %}
-              <i class="fa-solid fa-xmark"></i>
+              <svg class="notif-icon-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M18 6 6 18"></path>
+                <path d="m6 6 12 12"></path>
+              </svg>
             {% else %}
-              <i class="fa-regular fa-bell"></i>
+              <svg class="notif-icon-svg" viewBox="0 0 24 24" focusable="false">
+                <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
             {% endif %}
           </div>
 
