@@ -476,7 +476,7 @@
                   <!-- Documentos PDF -->
                   <td>
                     <div class="doc-links">
-                      {% if s in ['em_espera', 'pendente', 'deferido'] %}
+                      {% if s in ['em_espera', 'pendente', 'deferido'] and mkey not in ['FS', 'LM'] %}
                         <a class="proto-link declaration-link"
                            href="{{ url_for('agendamento_declaracao_ponto', agendamento_id=ag.id) }}"
                            target="_blank"

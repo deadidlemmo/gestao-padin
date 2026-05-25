@@ -1091,6 +1091,7 @@
                   {% set data_formatada = item.data.strftime('%d/%m/%Y') if item.data else 'Sem Data' %}
                   {% set data_iso = item.data.strftime('%Y-%m-%d') if item.data else '' %}
                   {% set motivo_texto = item.motivo if item.motivo else 'Sem Motivo' %}
+                  {% set motivo_codigo = (motivo_texto|string)|trim|upper %}
                   {% set tipo_slug = item.tipo_slug if item.tipo_slug is defined else ('agendamento' if item.tipo == 'Agendamento' else 'esquecimento') %}
 
                   {% if item.usuario %}
@@ -1176,7 +1177,7 @@
                     <td class="col-motivo">{{ motivo_texto }}</td>
 
                     <td class="col-declaracao">
-                      {% if tipo_slug == 'agendamento' %}
+                      {% if tipo_slug == 'agendamento' and motivo_codigo not in ['FS', 'LM'] %}
                         <a
                           class="declaracao-link"
                           href="{{ url_for('agendamento_declaracao_ponto', agendamento_id=item.id) }}"

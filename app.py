@@ -3038,6 +3038,15 @@ def _is_agendamento_deferido(agendamento) -> bool:
     return status.startswith("deferid")
 
 
+def _agendamento_tem_declaracao_ponto(agendamento) -> bool:
+    motivo = (
+        getattr(agendamento, "motivo", None)
+        or getattr(agendamento, "tipo_folga", None)
+        or ""
+    ).strip().upper()
+    return motivo not in {"FS", "LM"}
+
+
 def _assinatura_diretora_abs_path():
     base_dirs = (
         Path(current_app.root_path),
@@ -3057,6 +3066,9 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
     Em deferidos, aplica a imagem de assinatura/carimbo da chefia se existir.
     """
     from reportlab.pdfbase.pdfmetrics import stringWidth
+
+    if not _agendamento_tem_declaracao_ponto(agendamento):
+        raise ValueError("Declaracao de ponto indisponivel para este motivo.")
 
     pdf_path = _declaracao_ponto_abs_path(agendamento.id)
     deferido = _is_agendamento_deferido(agendamento)
@@ -3307,6 +3319,9 @@ def agendamento_declaracao_ponto(agendamento_id):
 
     if current_user.tipo != "administrador" and ag.funcionario_id != current_user.id:
         abort(403)
+
+    if not _agendamento_tem_declaracao_ponto(ag):
+        abort(404)
 
     usuario = User.query.get(ag.funcionario_id)
     if not usuario:
@@ -4383,17 +4398,18 @@ def admin_agendar_para():
                     "warning",
                 )
 
-            try:
-                gerar_declaracao_ponto_pdf(primeiro, usuario_alvo)
-            except Exception:
-                current_app.logger.exception(
-                    "Falha ao gerar declaracao de ponto do agendamento %s",
-                    getattr(primeiro, "id", None),
-                )
-                flash(
-                    "Agendamento deferido e registrado, mas não foi possível gerar a declaração de ponto em PDF.",
-                    "warning",
-                )
+            if _agendamento_tem_declaracao_ponto(primeiro):
+                try:
+                    gerar_declaracao_ponto_pdf(primeiro, usuario_alvo)
+                except Exception:
+                    current_app.logger.exception(
+                        "Falha ao gerar declaracao de ponto do agendamento %s",
+                        getattr(primeiro, "id", None),
+                    )
+                    flash(
+                        "Agendamento deferido e registrado, mas não foi possível gerar a declaração de ponto em PDF.",
+                        "warning",
+                    )
 
             # =========================
             # E-MAIL para o USUÁRIO ALVO (1 e-mail só; período para LM)
@@ -5794,7 +5810,9 @@ def deferir_folgas():
                     "warning",
                 )
 
-            if novo_status == "deferido":
+            if novo_status == "deferido" and _agendamento_tem_declaracao_ponto(
+                folga_principal
+            ):
                 try:
                     gerar_declaracao_ponto_pdf(folga_principal, usuario)
                 except Exception:
