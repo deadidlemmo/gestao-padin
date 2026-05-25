@@ -37,8 +37,10 @@
             {% set _read = n.read|default(false, true) %}
             {% set _level = n.level|default('info', true) %}
             {% set _url = n.url|default('', true) %}
+            {% set _source = n.source|default('', true) %}
             <a class="gp-notif {% if not _read %}is-unread{% endif %}" role="menuitem"
                href="{{ _url if _url else '#' }}"
+               {% if _source and n.id %}data-gp-item-read-url="{{ url_for('notifications_header_item_read') }}" data-gp-source="{{ _source }}" data-gp-id="{{ n.id }}"{% endif %}
                {% if not _url %}onclick="event.preventDefault()"{% endif %}>
               <span class="gp-dot gp-dot--{{ _level }}"></span>
               <span class="gp-notif__txt">
@@ -509,7 +511,7 @@
 
   const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
-  async function postJSON(url){
+  async function postJSON(url, payload = {}){
     const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
@@ -517,7 +519,7 @@
         'Content-Type': 'application/json',
         ...(csrf ? {'X-CSRFToken': csrf, 'X-CSRF-Token': csrf} : {})
       },
-      body: JSON.stringify({})
+      body: JSON.stringify(payload || {})
     });
     return res.ok ? res.json().catch(() => ({})) : null;
   }
@@ -563,6 +565,23 @@
       }
     });
   }
+
+  root.querySelectorAll('[data-gp-item-read-url]').forEach((link) => {
+    link.addEventListener('click', async (event) => {
+      const href = link.getAttribute('href');
+      if(!href || href === '#') return;
+
+      event.preventDefault();
+      try{
+        await postJSON(link.getAttribute('data-gp-item-read-url'), {
+          source: link.getAttribute('data-gp-source'),
+          id: link.getAttribute('data-gp-id')
+        });
+      }finally{
+        window.location.href = href;
+      }
+    });
+  });
 })();
 </script>
 {% endif %}

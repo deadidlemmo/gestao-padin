@@ -1135,6 +1135,7 @@ def _build_header_notifications(user, limit: int = 8):
                         "level": note.level or "info",
                         "url": note.url or "#",
                         "read": False,
+                        "source": "app",
                     }
                 )
         except SQLAlchemyError:
@@ -1167,6 +1168,7 @@ def _build_header_notifications(user, limit: int = 8):
                 "level": "info",
                 "url": url,
                 "read": False,
+                "source": "event",
             }
         )
 
@@ -1193,6 +1195,7 @@ def _build_header_notifications(user, limit: int = 8):
                         "level": severity_level.get(note.severity, "info"),
                         "url": url_for("admin_patch_notes_page"),
                         "read": False,
+                        "source": "release",
                     }
                 )
 
@@ -1244,6 +1247,48 @@ def _mark_all_notifications_read(user):
 
     db.session.commit()
     return {"app": marked_app, "events": marked_events, "releases": marked_releases}
+
+
+def _mark_header_notification_read(user, source, item_id):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {"app": 0, "events": 0, "releases": 0}
+
+    source = (source or "").strip().lower()
+    try:
+        item_id = int(item_id)
+    except (TypeError, ValueError):
+        return {"app": 0, "events": 0, "releases": 0}
+
+    marked = {"app": 0, "events": 0, "releases": 0}
+
+    if source == "app":
+        if not _app_notifications_table_available():
+            return marked
+        note = AppNotification.query.filter_by(id=item_id, user_id=user.id).first()
+        if note and not note.is_read:
+            note.is_read = True
+            note.read_at = datetime.datetime.utcnow()
+            marked["app"] = 1
+
+    elif source == "event":
+        exists = EventoVisto.query.filter_by(user_id=user.id, evento_id=item_id).first()
+        if not exists:
+            db.session.add(EventoVisto(user_id=user.id, evento_id=item_id))
+            marked["events"] = 1
+
+    elif source == "release":
+        if (getattr(user, "tipo", "") or "").strip().lower() == "administrador":
+            exists = ReleaseNoteRead.query.filter_by(
+                user_id=user.id, release_id=item_id
+            ).first()
+            if not exists:
+                db.session.add(ReleaseNoteRead(user_id=user.id, release_id=item_id))
+                marked["releases"] = 1
+
+    if any(marked.values()):
+        db.session.commit()
+
+    return marked
 
 
 def _clear_notifications(user):
@@ -1478,6 +1523,22 @@ def notifications_mark_all_read():
         db.session.rollback()
         current_app.logger.exception("Falha ao marcar notificacoes como lidas.")
         return jsonify({"ok": False, "error": "Falha ao atualizar notificacoes."}), 500
+
+
+@app.route("/notifications/header_item_read", methods=["POST"])
+@login_required
+def notifications_header_item_read():
+    try:
+        data = request.get_json(silent=True) or request.form
+        marked = _mark_header_notification_read(
+            current_user, data.get("source"), data.get("id")
+        )
+        _, unread = _build_header_notifications(current_user)
+        return jsonify({"ok": True, "marked": marked, "unread": unread})
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao marcar notificacao do sino como lida.")
+        return jsonify({"ok": False, "error": "Falha ao atualizar notificacao."}), 500
 
 
 @app.route("/notifications/clear", methods=["POST"])
