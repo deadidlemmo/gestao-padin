@@ -586,6 +586,7 @@
     .col-tipo{ width:128px; text-align:center !important; }
     .col-data{ width:84px; }
     .col-motivo{ width:66px; max-width:66px; text-align:left !important; word-break:break-word; }
+    .col-declaracao{ width:112px; text-align:center !important; }
     .col-hora{ width:66px; }
     .col-conferido{
       width:82px;
@@ -709,6 +710,36 @@
     .check-toggle.checked i{
       opacity:1;
       transform:scale(1);
+    }
+
+    .declaracao-link{
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      padding:6px 9px;
+      border-radius:999px;
+      border:1px solid #bbf7d0;
+      background:#ecfdf5;
+      color:#047857;
+      font-size:.74rem;
+      font-weight:900;
+      text-decoration:none;
+      white-space:nowrap;
+      box-shadow:0 4px 12px rgba(16,185,129,.12);
+      transition:background .16s ease, border-color .16s ease, transform .12s ease;
+    }
+
+    .declaracao-link:hover{
+      background:#d1fae5;
+      border-color:#86efac;
+      color:#065f46;
+      transform:translateY(-1px);
+      text-decoration:none;
+    }
+
+    .declaracao-link i{
+      font-size:.82rem;
     }
 
     .empty-filter-state{
@@ -1046,6 +1077,7 @@
                         <span>Motivo</span><i class="fa-solid fa-sort sort-icon"></i>
                       </button>
                     </th>
+                    <th class="col-declaracao">Declaração</th>
                     <th class="col-hora">1ª Ent.</th>
                     <th class="col-hora">1ª Saída</th>
                     <th class="col-hora">2ª Ent.</th>
@@ -1142,6 +1174,23 @@
 
                     <td class="col-data">{{ data_formatada }}</td>
                     <td class="col-motivo">{{ motivo_texto }}</td>
+
+                    <td class="col-declaracao">
+                      {% if tipo_slug == 'agendamento' %}
+                        <a
+                          class="declaracao-link"
+                          href="{{ url_for('agendamento_declaracao_ponto', agendamento_id=item.id) }}"
+                          target="_blank"
+                          rel="noopener"
+                          title="Abrir declaração institucional"
+                        >
+                          <i class="fa-solid fa-file-signature" aria-hidden="true"></i>
+                          <span>Declaração</span>
+                        </a>
+                      {% else %}
+                        <span style="font-size:.8rem; color:#94a3b8;">—</span>
+                      {% endif %}
+                    </td>
 
                     {% if item.tipo == 'Esquecimento de Ponto' %}
                       <td class="col-hora">{{ item.horapentrada }}</td>
