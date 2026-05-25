@@ -42,7 +42,8 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import cm, mm
 from reportlab.pdfgen import canvas
-from sqlalchemy import asc, case, func, or_, text
+from sqlalchemy import asc, case, func, inspect, or_, text
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload, selectinload
 from werkzeug.security import check_password_hash, generate_password_hash
 from werkzeug.utils import secure_filename
@@ -848,6 +849,47 @@ class ReleaseNoteRead(db.Model):
     )
 
 
+class AppNotification(db.Model):
+    __tablename__ = "app_notification"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(
+        db.Integer,
+        db.ForeignKey("user.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+
+    title = db.Column(db.String(180), nullable=False)
+    body = db.Column(db.Text, nullable=True)
+    level = db.Column(db.String(20), nullable=False, default="info", index=True)
+    url = db.Column(db.String(500), nullable=True)
+
+    kind = db.Column(db.String(40), nullable=False, default="system", index=True)
+    entity_type = db.Column(db.String(40), nullable=True, index=True)
+    entity_id = db.Column(db.Integer, nullable=True, index=True)
+
+    is_read = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    is_cleared = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    created_at = db.Column(
+        db.DateTime, default=datetime.datetime.utcnow, nullable=False, index=True
+    )
+    read_at = db.Column(db.DateTime, nullable=True)
+    cleared_at = db.Column(db.DateTime, nullable=True)
+
+    usuario = db.relationship(
+        "User",
+        backref=db.backref("app_notifications", lazy=True),
+        foreign_keys=[user_id],
+        lazy=True,
+    )
+
+    __table_args__ = (
+        Index("ix_app_notification_user_unread", "user_id", "is_read", "is_cleared"),
+        Index("ix_app_notification_entity", "entity_type", "entity_id"),
+    )
+
+
 class UserHorarioTrabalho(db.Model):
     __tablename__ = "user_horario_trabalho"
 
@@ -947,9 +989,124 @@ def _fmt_notif_date(value):
     if not value:
         return ""
     try:
+        if hasattr(value, "hour"):
+            return value.strftime("%d/%m/%Y %H:%M")
         return value.strftime("%d/%m/%Y")
     except Exception:
         return str(value)
+
+
+def _app_notifications_table_available():
+    cached = current_app.config.get("_APP_NOTIFICATIONS_TABLE_AVAILABLE")
+    if cached is not None:
+        return bool(cached)
+
+    try:
+        available = inspect(db.engine).has_table(AppNotification.__tablename__)
+        current_app.config["_APP_NOTIFICATIONS_TABLE_AVAILABLE"] = bool(available)
+        return bool(available)
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao verificar tabela app_notification.")
+        current_app.config["_APP_NOTIFICATIONS_TABLE_AVAILABLE"] = False
+        return False
+
+
+def _app_notifications_query(user_id: int):
+    return (
+        AppNotification.query.filter(
+            AppNotification.user_id == user_id,
+            AppNotification.is_cleared.is_(False),
+        )
+        .order_by(AppNotification.created_at.desc(), AppNotification.id.desc())
+    )
+
+
+def _queue_user_notification(
+    user_id,
+    title,
+    body=None,
+    level="info",
+    url=None,
+    kind="system",
+    entity_type=None,
+    entity_id=None,
+):
+    if not user_id or not title:
+        return None
+
+    if not _app_notifications_table_available():
+        return None
+
+    note = AppNotification(
+        user_id=int(user_id),
+        title=str(title)[:180],
+        body=(str(body) if body is not None else None),
+        level=(level or "info")[:20],
+        url=(str(url)[:500] if url else None),
+        kind=(kind or "system")[:40],
+        entity_type=(entity_type[:40] if entity_type else None),
+        entity_id=int(entity_id) if entity_id is not None else None,
+    )
+    db.session.add(note)
+    return note
+
+
+def _create_user_notification(*args, **kwargs):
+    try:
+        note = _queue_user_notification(*args, **kwargs)
+        if not note:
+            return None
+        db.session.commit()
+        return note
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao gravar notificacao de usuario.")
+        return None
+
+
+def _notify_admins(
+    title,
+    body=None,
+    level="info",
+    url=None,
+    kind="admin_alert",
+    entity_type=None,
+    entity_id=None,
+    exclude_user_id=None,
+):
+    if not _app_notifications_table_available():
+        return 0
+
+    try:
+        q = User.query.filter(func.lower(func.coalesce(User.tipo, "")) == "administrador")
+        if hasattr(User, "ativo"):
+            q = q.filter(User.ativo.is_(True))
+        if hasattr(User, "status"):
+            q = q.filter(User.status == "aprovado")
+        if exclude_user_id:
+            q = q.filter(User.id != int(exclude_user_id))
+
+        count = 0
+        for admin in q.all():
+            if _queue_user_notification(
+                admin.id,
+                title,
+                body=body,
+                level=level,
+                url=url,
+                kind=kind,
+                entity_type=entity_type,
+                entity_id=entity_id,
+            ):
+                count += 1
+        if count:
+            db.session.commit()
+        return count
+    except SQLAlchemyError:
+        db.session.rollback()
+        current_app.logger.exception("Falha ao notificar administradores.")
+        return 0
 
 
 def _build_header_notifications(user, limit: int = 8):
@@ -957,8 +1114,38 @@ def _build_header_notifications(user, limit: int = 8):
         return [], 0
 
     items = []
+    unread = 0
 
-    eventos = _eventos_nao_lidos_query(user.id).limit(limit).all()
+    if _app_notifications_table_available():
+        try:
+            app_unread_q = _app_notifications_query(user.id).filter(
+                AppNotification.is_read.is_(False)
+            )
+            unread += app_unread_q.count()
+
+            app_notes = app_unread_q.limit(limit).all()
+            for note in app_notes:
+                items.append(
+                    {
+                        "kind": note.kind or "system",
+                        "id": note.id,
+                        "title": note.title or "Notificacao",
+                        "body": note.body or "",
+                        "created_at": _fmt_notif_date(note.created_at),
+                        "level": note.level or "info",
+                        "url": note.url or "#",
+                        "read": False,
+                    }
+                )
+        except SQLAlchemyError:
+            db.session.rollback()
+            current_app.config["_APP_NOTIFICATIONS_TABLE_AVAILABLE"] = False
+
+    remaining = max(limit - len(items), 0)
+    event_unread_q = _eventos_nao_lidos_query(user.id)
+    unread += event_unread_q.count()
+
+    eventos = event_unread_q.limit(remaining).all() if remaining else []
     for ev in eventos:
         ref_date = ev.data_inicio or ev.data_evento or ev.data_fim
         if ev.data_inicio and ev.data_fim and ev.data_inicio != ev.data_fim:
@@ -985,8 +1172,10 @@ def _build_header_notifications(user, limit: int = 8):
 
     if (getattr(user, "tipo", "") or "").strip().lower() == "administrador":
         remaining = max(limit - len(items), 0)
+        release_unread_q = _release_notes_nao_lidas_query(user.id)
+        unread += release_unread_q.count()
         if remaining:
-            notes = _release_notes_nao_lidas_query(user.id).limit(remaining).all()
+            notes = release_unread_q.limit(remaining).all()
             severity_level = {
                 "info": "info",
                 "improvement": "success",
@@ -1007,7 +1196,7 @@ def _build_header_notifications(user, limit: int = 8):
                     }
                 )
 
-    return items, len(items)
+    return items, unread
 
 
 @app.context_processor
@@ -1023,7 +1212,18 @@ def inject_header_notifications():
 
 def _mark_all_notifications_read(user):
     if not user or not getattr(user, "is_authenticated", False):
-        return {"events": 0, "releases": 0}
+        return {"app": 0, "events": 0, "releases": 0}
+
+    marked_app = 0
+    if _app_notifications_table_available():
+        app_notes = _app_notifications_query(user.id).filter(
+            AppNotification.is_read.is_(False)
+        ).all()
+        now = datetime.datetime.utcnow()
+        for note in app_notes:
+            note.is_read = True
+            note.read_at = now
+            marked_app += 1
 
     marked_events = 0
     for ev in _eventos_nao_lidos_query(user.id).all():
@@ -1043,7 +1243,32 @@ def _mark_all_notifications_read(user):
                 marked_releases += 1
 
     db.session.commit()
-    return {"events": marked_events, "releases": marked_releases}
+    return {"app": marked_app, "events": marked_events, "releases": marked_releases}
+
+
+def _clear_notifications(user):
+    if not user or not getattr(user, "is_authenticated", False):
+        return {"app": 0, "events": 0, "releases": 0}
+
+    marked = _mark_all_notifications_read(user)
+
+    cleared_app = 0
+    if _app_notifications_table_available():
+        now = datetime.datetime.utcnow()
+        app_notes = _app_notifications_query(user.id).filter(
+            AppNotification.is_cleared.is_(False)
+        ).all()
+        for note in app_notes:
+            note.is_read = True
+            note.read_at = note.read_at or now
+            note.is_cleared = True
+            note.cleared_at = now
+            cleared_app += 1
+        if cleared_app:
+            db.session.commit()
+
+    marked["app_cleared"] = cleared_app
+    return marked
 
 
 @app.route("/notifications/mark_all_read", methods=["POST"])
@@ -1062,7 +1287,7 @@ def notifications_mark_all_read():
 @login_required
 def notifications_clear():
     try:
-        marked = _mark_all_notifications_read(current_user)
+        marked = _clear_notifications(current_user)
         return jsonify({"ok": True, "marked": marked, "unread": 0})
     except Exception:
         db.session.rollback()
@@ -2605,6 +2830,41 @@ def agendar():
                     "warning",
                 )
 
+            try:
+                dt_ini_notif = ag_principal.data
+                dt_fim_notif = getattr(ag_principal, "data_fim", None)
+                if dt_fim_notif and dt_fim_notif != dt_ini_notif:
+                    notif_data = f"{dt_ini_notif.strftime('%d/%m/%Y')} a {dt_fim_notif.strftime('%d/%m/%Y')}"
+                else:
+                    notif_data = dt_ini_notif.strftime("%d/%m/%Y")
+
+                _create_user_notification(
+                    current_user.id,
+                    "Agendamento registrado",
+                    body=f"{descricao_motivo} para {notif_data}. Status: em espera.",
+                    level="warning",
+                    url=url_for("minhas_justificativas"),
+                    kind="agendamento_criado",
+                    entity_type="agendamento",
+                    entity_id=ag_principal.id,
+                )
+
+                _notify_admins(
+                    "Novo agendamento aguardando analise",
+                    body=f"{current_user.nome} solicitou {descricao_motivo} para {notif_data}.",
+                    level="warning",
+                    url=url_for("deferir_folgas"),
+                    kind="agendamento_pendente",
+                    entity_type="agendamento",
+                    entity_id=ag_principal.id,
+                    exclude_user_id=current_user.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao do agendamento %s",
+                    getattr(ag_principal, "id", None),
+                )
+
             # =========================
             # E-MAILS PERSONALIZADOS
             # =========================
@@ -3353,6 +3613,23 @@ def admin_agendar_para():
             # =========================
             # E-MAIL para o USUÁRIO ALVO (1 e-mail só; período para LM)
             # =========================
+            try:
+                _create_user_notification(
+                    usuario_alvo.id,
+                    f"{descricao_motivo} deferido(a)",
+                    body=f"A administracao registrou {descricao_motivo} para {data_str}. Status: deferido.",
+                    level="success",
+                    url=url_for("minhas_justificativas"),
+                    kind="agendamento_deferido",
+                    entity_type="agendamento",
+                    entity_id=primeiro.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao do agendamento admin %s",
+                    getattr(primeiro, "id", None),
+                )
+
             nome = (usuario_alvo.nome or "").strip() or "Servidor(a)"
             status_label = "DEFERIDO"
             admin_nome = (current_user.nome or "").strip() or "Administração"
@@ -4720,6 +4997,30 @@ def deferir_folgas():
             if not lote_regs and folga.motivo == "TRE":
                 sync_tre_user(usuario.id)
 
+            try:
+                dt_ini_n = _get_dt_ini(folga_principal)
+                dt_fim_n = _get_dt_fim(folga_principal)
+                periodo_n = _fmt_periodo(dt_ini_n, dt_fim_n)
+                motivo_n = (folga_principal.motivo or "Agendamento").strip()
+                decisao_n = (
+                    "deferido" if novo_status == "deferido" else "indeferido"
+                )
+                _create_user_notification(
+                    usuario.id,
+                    f"Agendamento {decisao_n}",
+                    body=f"{motivo_n} de {periodo_n} foi {decisao_n}.",
+                    level="success" if novo_status == "deferido" else "danger",
+                    url=url_for("minhas_justificativas"),
+                    kind=f"agendamento_{decisao_n}",
+                    entity_type="agendamento",
+                    entity_id=folga_principal.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao de decisao do agendamento %s",
+                    getattr(folga_principal, "id", None),
+                )
+
             # Flash (mantém padrão; se lote LM, fala “período”)
             if lote_regs:
                 dt_ini_l = min([x.data for x in lote_regs if x.data])
@@ -5487,6 +5788,35 @@ def cadastrar_horas():
             db.session.add(novo_banco_horas)
             db.session.commit()
 
+            try:
+                data_bh = data_realizacao.strftime("%d/%m/%Y")
+                qtd_bh = f"{quantidade_horas}h {quantidade_minutos:02d}min"
+                _create_user_notification(
+                    current_user.id,
+                    "Banco de Horas cadastrado",
+                    body=f"Credito de {qtd_bh} em {data_bh}. Status: aguardando deferimento.",
+                    level="warning",
+                    url=url_for("consultar_horas"),
+                    kind="banco_horas_criado",
+                    entity_type="banco_de_horas",
+                    entity_id=novo_banco_horas.id,
+                )
+                _notify_admins(
+                    "Novo Banco de Horas aguardando deferimento",
+                    body=f"{current_user.nome} cadastrou {qtd_bh} para {data_bh}.",
+                    level="warning",
+                    url=url_for("deferir_horas"),
+                    kind="banco_horas_pendente",
+                    entity_type="banco_de_horas",
+                    entity_id=novo_banco_horas.id,
+                    exclude_user_id=current_user.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao do Banco de Horas %s",
+                    getattr(novo_banco_horas, "id", None),
+                )
+
             # =========================
             # E-mail premium: cadastrado e aguardando deferimento
             # =========================
@@ -6090,6 +6420,24 @@ def deferir_horas():
 
         try:
             db.session.commit()
+
+            try:
+                decisao_slug = "deferido" if decisao == "DEFERIDO" else "indeferido"
+                _create_user_notification(
+                    funcionario.id,
+                    f"Banco de Horas {decisao_slug}",
+                    body=f"Credito de {qtd_str} em {data_str} foi {decisao_slug}.",
+                    level="success" if decisao == "DEFERIDO" else "danger",
+                    url=url_for("consultar_horas"),
+                    kind=f"banco_horas_{decisao_slug}",
+                    entity_type="banco_de_horas",
+                    entity_id=banco_horas.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao de decisao do Banco de Horas %s",
+                    getattr(banco_horas, "id", None),
+                )
 
             # Após commit, calcula dados atuais para o e-mail (saldo e pendências)
             try:
@@ -8123,6 +8471,32 @@ def adicionar_tre():
             db.session.add(nova)
             db.session.commit()
             sync_tre_user(current_user.id)
+            try:
+                _create_user_notification(
+                    current_user.id,
+                    "TRE enviada para analise",
+                    body=f"Sua TRE de {nova.dias_folga} dia(s) foi cadastrada e esta pendente.",
+                    level="warning",
+                    url=url_for("minhas_tres"),
+                    kind="tre_criada",
+                    entity_type="tre",
+                    entity_id=nova.id,
+                )
+                _notify_admins(
+                    "Nova TRE aguardando analise",
+                    body=f"{current_user.nome} enviou TRE de {nova.dias_folga} dia(s).",
+                    level="warning",
+                    url=url_for("admin_tres_list", status="pendente"),
+                    kind="tre_pendente",
+                    entity_type="tre",
+                    entity_id=nova.id,
+                    exclude_user_id=current_user.id,
+                )
+            except Exception:
+                current_app.logger.exception(
+                    "Falha ao preparar notificacao da TRE %s",
+                    getattr(nova, "id", None),
+                )
             flash("TRE enviada para análise do administrador.", "success")
             return redirect(url_for("historico"))
         except Exception as e:
@@ -8266,6 +8640,23 @@ def admin_tre_decidir(tre_id: int):
         db.session.commit()
         sync_tre_user(user.id)
 
+        try:
+            _create_user_notification(
+                user.id,
+                "TRE deferida",
+                body=f"Sua TRE foi deferida com {dias_aprovados} dia(s) validado(s).",
+                level="success",
+                url=url_for("minhas_tres"),
+                kind="tre_deferida",
+                entity_type="tre",
+                entity_id=tre.id,
+            )
+        except Exception:
+            current_app.logger.exception(
+                "Falha ao preparar notificacao de deferimento da TRE %s",
+                getattr(tre, "id", None),
+            )
+
         # =========================
         # BOTBOT/WhatsApp para TRE deferida
         # =========================
@@ -8313,6 +8704,23 @@ def admin_tre_decidir(tre_id: int):
 
     db.session.commit()
     sync_tre_user(user.id)
+
+    try:
+        _create_user_notification(
+            user.id,
+            "TRE indeferida",
+            body="Sua TRE foi analisada e indeferida.",
+            level="danger",
+            url=url_for("minhas_tres"),
+            kind="tre_indeferida",
+            entity_type="tre",
+            entity_id=tre.id,
+        )
+    except Exception:
+        current_app.logger.exception(
+            "Falha ao preparar notificacao de indeferimento da TRE %s",
+            getattr(tre, "id", None),
+        )
 
     # =========================
     # BOTBOT/WhatsApp para TRE indeferida
@@ -8453,6 +8861,16 @@ def admin_tre_lancar():
             sync_tre_user(user.id)
 
             sinal = "+" if dias_final > 0 else ""
+            _create_user_notification(
+                user.id,
+                "TRE ajustada pela administração",
+                body=f"Seu saldo de TRE recebeu ajuste de {sinal}{dias_final} dia(s).",
+                level="success" if dias_final > 0 else "warning",
+                url=url_for("minhas_tres"),
+                kind="tre_ajuste_admin",
+                entity_type="tre",
+                entity_id=nova.id,
+            )
             flash(
                 f"TRE ajustada para {user.nome} ({sinal}{dias_final} dia(s)).",
                 "success",

@@ -22,19 +22,23 @@ def upgrade():
         batch_op.alter_column('hora_primeira_entrada',
                existing_type=sa.VARCHAR(length=5),
                type_=sa.Time(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="NULLIF(btrim(hora_primeira_entrada), '')::time")
         batch_op.alter_column('hora_primeira_saida',
                existing_type=sa.VARCHAR(length=5),
                type_=sa.Time(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="NULLIF(btrim(hora_primeira_saida), '')::time")
         batch_op.alter_column('hora_segunda_entrada',
                existing_type=sa.VARCHAR(length=5),
                type_=sa.Time(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="NULLIF(btrim(hora_segunda_entrada), '')::time")
         batch_op.alter_column('hora_segunda_saida',
                existing_type=sa.VARCHAR(length=5),
                type_=sa.Time(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using="NULLIF(btrim(hora_segunda_saida), '')::time")
         batch_op.drop_constraint('esquecimento_ponto_user_id_fkey', type_='foreignkey')
         batch_op.create_foreign_key(None, 'user', ['user_id'], ['id'])
 
@@ -49,10 +53,10 @@ def upgrade():
                existing_server_default=sa.text('0'))
         batch_op.alter_column('cpf',
                existing_type=sa.VARCHAR(length=14),
-               nullable=False)
+               nullable=True)
         batch_op.alter_column('rg',
                existing_type=sa.VARCHAR(length=20),
-               nullable=False)
+               nullable=True)
         batch_op.alter_column('orgao_emissor',
                existing_type=sa.VARCHAR(length=50),
                type_=sa.String(length=20),
