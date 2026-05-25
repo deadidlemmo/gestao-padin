@@ -3229,10 +3229,10 @@ def gerar_declaracao_ponto_pdf(agendamento, usuario) -> str:
         if assinatura_path:
             try:
                 assinatura_img = ImageReader(assinatura_path)
-                img_w = min(82 * mm, right - sig_x - 4 * mm)
-                img_h = 31 * mm
-                img_x = sig_x + 5 * mm
-                img_y = y - 12 * mm
+                img_w = min(58 * mm, right - sig_x - 4 * mm)
+                img_h = 18 * mm
+                img_x = sig_x + 18 * mm
+                img_y = y - 9 * mm
                 c.drawImage(
                     assinatura_img,
                     img_x,
