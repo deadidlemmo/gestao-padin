@@ -336,8 +336,8 @@
       border:1px solid #bfdbfe;
       background:#eff6ff;
       border-radius:14px;
-      padding:12px 14px;
-      gap:8px;
+      padding:14px 16px;
+      gap:10px;
     }
     .whatsapp-consent-row{
       display:flex;
@@ -399,6 +399,12 @@
     .whatsapp-consent .mini-note{
       margin:0 0 0 56px;
       color:#475569;
+    }
+    @media (max-width:560px){
+      .whatsapp-consent{ padding:12px; }
+      .whatsapp-consent-row{ align-items:flex-start; }
+      .whatsapp-toggle-control{ margin-top:1px; }
+      .whatsapp-consent .mini-note{ margin-left:0; }
     }
 
     footer{ background:linear-gradient(to right,#222,#444); color:#ddd; text-align:center; padding:15px 0; font-size:14px; border-top:2px solid #555; box-shadow:0px -2px 10px rgba(0,0,0,0.3); width:100%; flex-shrink:0; }
@@ -526,7 +532,7 @@
                 </span>
               </label>
               <div class="mini-note">
-                As mensagens pelo WhatsApp serao apenas avisos genericos para consultar o Portal do Servidor. Os detalhes continuam dentro do sistema.
+                Enviaremos apenas um aviso para acessar o portal quando houver novidade. Os detalhes ficam protegidos dentro do sistema.
               </div>
             </div>
 
@@ -550,7 +556,6 @@
                   <i class="fas fa-pen"></i>
                 </button>
               </div>
-              <div class="mini-note">Digite com ou sem máscara. O sistema normaliza automaticamente.</div>
             </div>
 
             <div class="editable-field">
