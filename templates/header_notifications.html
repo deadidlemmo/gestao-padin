@@ -1,31 +1,32 @@
 {# templates/header_notifications.html #}
 {% if current_user.is_authenticated %}
+{% set _notif_uid = notification_instance|default('global', true) %}
 {% set _unread = (notif_unread|default(0, true)) %}
 {% set _list = (notifications|default([], true)) %}
 
-<div class="gp-notify" id="gpNotifyRoot" role="region" aria-label="Notificações">
+<div class="gp-notify gp-notify--{{ _notif_uid }}" id="gpNotifyRoot-{{ _notif_uid }}" role="region" aria-label="Notificacoes" data-gp-notify-root data-gp-notify-instance="{{ _notif_uid }}">
   <div class="gp-notify__actions">
-    <button class="gp-iconbtn" type="button" id="gpNotifBtn"
-            aria-haspopup="true" aria-expanded="false" aria-controls="gpNotifMenu">
+    <button class="gp-iconbtn" type="button" id="gpNotifBtn-{{ _notif_uid }}"
+            aria-haspopup="true" aria-expanded="false" aria-controls="gpNotifMenu-{{ _notif_uid }}" data-gp-notif-btn>
       <svg class="gp-bell-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
         <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path>
         <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
       </svg>
-      <span class="gp-badge" id="gpNotifBadge" {% if _unread <= 0 %}style="display:none"{% endif %}>
+      <span class="gp-badge" id="gpNotifBadge-{{ _notif_uid }}" data-gp-notif-badge {% if _unread <= 0 %}style="display:none"{% endif %}>
         {{ _unread }}
       </span>
-      <span class="sr-only">Abrir notificações</span>
+      <span class="sr-only">Abrir notificacoes</span>
     </button>
 
-    <div class="gp-menu" id="gpNotifMenu" role="menu" aria-label="Notificações">
+    <div class="gp-menu" id="gpNotifMenu-{{ _notif_uid }}" role="menu" aria-label="Notificacoes" data-gp-notif-menu>
       <div class="gp-menu__head">
-        <div class="gp-menu__title">Notificações</div>
-        <button class="gp-linkbtn" type="button" id="gpMarkAllReadBtn" {% if _unread <= 0 %}disabled{% endif %}>
+        <div class="gp-menu__title">Notifica&ccedil;&otilde;es</div>
+        <button class="gp-linkbtn" type="button" id="gpMarkAllReadBtn-{{ _notif_uid }}" data-gp-mark-all {% if _unread <= 0 %}disabled{% endif %}>
           Marcar como lidas
         </button>
       </div>
 
-      <div class="gp-menu__body" id="gpNotifList">
+      <div class="gp-menu__body" id="gpNotifList-{{ _notif_uid }}" data-gp-notif-list>
         {% if _list|length == 0 %}
           <div class="gp-empty">
             <div class="gp-empty__title">Nada por aqui</div>
@@ -41,7 +42,7 @@
                {% if not _url %}onclick="event.preventDefault()"{% endif %}>
               <span class="gp-dot gp-dot--{{ _level }}"></span>
               <span class="gp-notif__txt">
-                <span class="gp-notif__title">{{ n.title|default('Notificação', true) }}</span>
+                <span class="gp-notif__title">{{ n.title|default('Notificacao', true) }}</span>
                 {% if n.body %}
                   <span class="gp-notif__body">{{ n.body }}</span>
                 {% endif %}
@@ -55,100 +56,123 @@
       </div>
 
       <div class="gp-menu__foot">
-        <button class="gp-ghostbtn" type="button" id="gpClearBtn">Limpar</button>
+        <button class="gp-ghostbtn" type="button" id="gpClearBtn-{{ _notif_uid }}" data-gp-clear>Limpar</button>
       </div>
     </div>
   </div>
 </div>
 
+{% if _notif_uid in ['desktop', 'global'] %}
 <style>
-  /* ✅ impede herança do header-bottom (letter-spacing, etc.) */
-  .gp-notify, .gp-notify *{
+  .gp-notify,
+  .gp-notify * {
     letter-spacing: normal !important;
     text-transform: none !important;
     font-family: 'Montserrat', system-ui, -apple-system, Segoe UI, Roboto, Arial !important;
+    box-sizing: border-box;
   }
 
-  /* Garantia contra corte por overflow no header */
-  .header-desktop, .header-mobile, .header-bottom{ overflow: visible !important; }
+  .header-desktop,
+  .header-mobile,
+  .header-bottom,
+  .header-actions {
+    overflow: visible !important;
+  }
 
-  .gp-notify{
+  .gp-notify {
     --gp-brand: var(--brand, #007bff);
     --gp-ink: var(--brand, #007bff);
-    --gp-border: rgba(0,123,255,.26);
-    --gp-shadow: 0 18px 50px rgba(15,23,42,.18);
+    --gp-border: rgba(0, 123, 255, .26);
+    --gp-shadow: 0 18px 50px rgba(15, 23, 42, .18);
     --gp-card: #ffffff;
     --gp-text: var(--ink, #0f172a);
     --gp-muted: var(--muted, #6b7280);
 
-    position: fixed;
+    position: relative;
     z-index: 2200;
-    top: 12px;
-    right: 12px;
+    display: inline-flex;
+    align-items: center;
+    flex: 0 0 auto;
+    overflow: visible !important;
   }
 
-  /* Desktop: posição boa sem brigar com o Home */
-  @media (min-width: 769px){
-    .gp-notify{
-      top: 55px;
-      transform: translateY(-50%);
-      right: 92px;
+  .header-actions .gp-notify,
+  .header-mobile .gp-notify {
+    position: relative !important;
+    top: auto !important;
+    right: auto !important;
+    transform: none !important;
+  }
+
+  @media (max-width: 768px) {
+    .header-bottom {
+      overflow: visible !important;
+      flex-wrap: nowrap !important;
     }
 
-    .header-actions .gp-notify{
-      position: static !important;
-      top: auto !important;
-      right: auto !important;
-      transform: none !important;
-      z-index: auto !important;
+    .header-bottom > span {
+      min-width: 0 !important;
+      flex: 0 1 auto !important;
     }
 
-    .gp-notify.gp-notify--desktop-docked{
-      position: absolute !important;
-      top: 50% !important;
-      right: 92px !important;
-      transform: translateY(-50%) !important;
-      z-index: 30 !important;
+    .header-mobile .gp-notify {
+      display: inline-flex !important;
+      z-index: 3 !important;
     }
   }
 
-  /* Quando encaixado no mobile ao lado do Home */
-  .gp-notify.gp-notify--docked{
-    position: static;
-    top: auto;
-    right: auto;
-    transform: none;
-    z-index: auto;
+  @media (max-width: 380px) {
+    .header-bottom {
+      gap: 8px !important;
+      padding-left: 8px !important;
+      padding-right: 8px !important;
+    }
+
+    .header-bottom > span {
+      font-size: .95rem !important;
+      letter-spacing: 3px !important;
+    }
   }
 
-  .sr-only{
-    position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;
-    clip:rect(0,0,0,0);white-space:nowrap;border:0;
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 
-  .gp-notify__actions{
-    position: relative; /* âncora (desktop) */
+  .gp-notify__actions {
+    position: relative;
     display: flex;
     align-items: center;
+    overflow: visible !important;
   }
 
-  .gp-iconbtn{
+  .gp-iconbtn {
     position: relative;
     width: 40px;
     height: 40px;
     border-radius: 12px;
     border: 1px solid var(--gp-border);
-    background: rgba(255,255,255,.94);
+    background: rgba(255, 255, 255, .94);
     color: var(--gp-ink);
     display: grid;
     place-items: center;
     cursor: pointer;
-    box-shadow: 0 8px 18px rgba(15,23,42,.18);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, .18);
     backdrop-filter: blur(8px);
     transition: transform .12s ease, background .12s ease, border-color .12s ease;
+    overflow: visible !important;
+    flex: 0 0 auto;
   }
-  .gp-iconbtn .gp-bell-icon{
-    display:block;
+
+  .gp-iconbtn .gp-bell-icon {
+    display: block;
     width: 19px;
     height: 19px;
     fill: none;
@@ -158,118 +182,145 @@
     stroke-linejoin: round;
     color: currentColor !important;
   }
-  .gp-iconbtn:hover{
-    background: #ffffff;
-    border-color: rgba(0,123,255,.45);
-  }
-  .gp-iconbtn:active{ transform: scale(.98); }
 
-  /* Compacto quando dockado no mobile */
-  .gp-notify--docked .gp-iconbtn{
+  .gp-iconbtn:hover {
+    background: #ffffff;
+    border-color: rgba(0, 123, 255, .45);
+  }
+
+  .gp-iconbtn:active {
+    transform: scale(.98);
+  }
+
+  .header-mobile .gp-iconbtn {
     width: 36px;
     height: 36px;
     border-radius: 10px;
-    box-shadow: 0 6px 14px rgba(0,0,0,.22);
+    box-shadow: 0 6px 14px rgba(0, 0, 0, .22);
     background: #ffffff;
-    border-color: rgba(255,255,255,.9);
+    border-color: rgba(255, 255, 255, .9);
     color: #007bff;
   }
-  .gp-notify--docked .gp-iconbtn:hover{
+
+  .header-mobile .gp-iconbtn:hover {
     background: #f8fbff;
     border-color: #ffffff;
   }
 
-  .gp-badge{
-    position:absolute;
-    top: -6px;
-    right: -6px;
+  .gp-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
     min-width: 18px;
     height: 18px;
-    padding: 0 6px;
+    padding: 0 5px;
     border-radius: 999px;
     background: #ef4444;
     color: #fff;
     font-size: 12px;
-    line-height: 18px;
+    line-height: 1;
     font-weight: 800;
-    border: 2px solid rgba(0,123,255,.95);
-    text-align:center;
+    border: 2px solid #ffffff;
+    text-align: center;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2;
+    box-shadow: 0 2px 5px rgba(15, 23, 42, .25);
   }
 
-  /* Dropdown (desktop: absoluto e ancorado no sino) */
-  .gp-menu{
+  .gp-menu {
     position: absolute;
     right: 0;
     top: calc(100% + 10px);
-
     width: 380px;
     max-width: calc(100vw - 24px);
-
     background: var(--gp-card);
-    border: 1px solid rgba(148,163,184,0.35);
+    border: 1px solid rgba(148, 163, 184, .35);
     border-radius: 16px;
     box-shadow: var(--gp-shadow);
     overflow: hidden;
     display: none;
     z-index: 2300;
-
     text-align: left !important;
-    box-sizing: border-box;
     overflow-x: hidden;
   }
-  .gp-menu, .gp-menu *{
+
+  .gp-menu,
+  .gp-menu * {
     white-space: normal !important;
   }
-  .gp-menu.is-open{ display:block; }
 
-  /* Mobile menor */
-  @media (max-width: 480px){
-    .gp-menu{
+  .gp-menu.is-open {
+    display: block;
+  }
+
+  @media (max-width: 480px) {
+    .gp-menu {
       width: min(340px, calc(100vw - 24px));
       max-width: calc(100vw - 24px);
     }
   }
 
-  .gp-menu__head, .gp-menu__foot{
-    padding: 12px 12px;
-    display:flex;
-    align-items:center;
-    justify-content:space-between;
+  .gp-menu__head,
+  .gp-menu__foot {
+    padding: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     flex-wrap: wrap;
     gap: 10px;
-    border-bottom: 1px solid rgba(148,163,184,0.22);
+    border-bottom: 1px solid rgba(148, 163, 184, .22);
   }
-  .gp-menu__foot{ border-bottom: 0; border-top: 1px solid rgba(148,163,184,0.22); }
 
-  .gp-menu__title{
+  .gp-menu__foot {
+    border-bottom: 0;
+    border-top: 1px solid rgba(148, 163, 184, .22);
+  }
+
+  .gp-menu__title {
     font-weight: 900;
     color: var(--gp-text);
     min-width: 0;
   }
 
-  .gp-linkbtn{
-    border:0;
+  .gp-linkbtn {
+    border: 0;
     background: transparent;
     color: var(--gp-brand);
     font-weight: 900;
-    cursor:pointer;
+    cursor: pointer;
     padding: 6px 10px;
     border-radius: 10px;
     white-space: nowrap !important;
     flex: 0 0 auto;
   }
-  .gp-linkbtn:disabled{ opacity:.45; cursor:not-allowed; }
-  .gp-linkbtn:hover:not(:disabled){ background: rgba(0,123,255,.10); }
 
-  .gp-menu__body{
-    max-height: min(420px, 60vh);
-    overflow-y:auto;
-    overflow-x:hidden;
+  .gp-linkbtn:disabled {
+    opacity: .45;
+    cursor: not-allowed;
   }
 
-  .gp-empty{ padding: 16px 14px; }
-  .gp-empty__title{ font-weight: 900; color: var(--gp-text); }
-  .gp-empty__sub{
+  .gp-linkbtn:hover:not(:disabled) {
+    background: rgba(0, 123, 255, .10);
+  }
+
+  .gp-menu__body {
+    max-height: min(420px, 60vh);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .gp-empty {
+    padding: 16px 14px;
+  }
+
+  .gp-empty__title {
+    font-weight: 900;
+    color: var(--gp-text);
+  }
+
+  .gp-empty__sub {
     color: var(--gp-muted);
     margin-top: 4px;
     font-size: 13px;
@@ -277,59 +328,86 @@
     overflow-wrap: anywhere;
   }
 
-  .gp-notif{
-    display:flex;
+  .gp-notif {
+    display: flex;
     gap: 10px;
     padding: 12px 14px;
-    text-decoration:none;
-    border-bottom: 1px solid rgba(148,163,184,0.18);
+    text-decoration: none;
+    border-bottom: 1px solid rgba(148, 163, 184, .18);
     color: var(--gp-text);
     transition: background .12s ease;
   }
-  .gp-notif:hover{ background: rgba(0,0,0,.03); }
-  .gp-notif.is-unread{ background: rgba(0,123,255,.08); }
 
-  .gp-dot{
-    width:10px;height:10px;border-radius: 999px;
-    margin-top: 5px; flex: 0 0 auto;
+  .gp-notif:hover {
+    background: rgba(0, 0, 0, .03);
   }
-  .gp-dot--info{ background:#2563eb; }
-  .gp-dot--success{ background:#16a34a; }
-  .gp-dot--warning{ background:#d97706; }
-  .gp-dot--danger{ background:#dc2626; }
 
-  .gp-notif__txt{ min-width: 0; display:flex; flex-direction:column; }
-  .gp-notif__title{ font-weight: 900; overflow-wrap: anywhere; }
-  .gp-notif__body{
+  .gp-notif.is-unread {
+    background: rgba(0, 123, 255, .08);
+  }
+
+  .gp-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    margin-top: 5px;
+    flex: 0 0 auto;
+  }
+
+  .gp-dot--info { background: #2563eb; }
+  .gp-dot--success { background: #16a34a; }
+  .gp-dot--warning { background: #d97706; }
+  .gp-dot--danger { background: #dc2626; }
+
+  .gp-notif__txt {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .gp-notif__title {
+    font-weight: 900;
+    overflow-wrap: anywhere;
+  }
+
+  .gp-notif__body {
     color: var(--gp-muted);
     font-size: 13px;
     margin-top: 2px;
     line-height: 1.25rem;
     overflow-wrap: anywhere;
   }
-  .gp-notif__time{ color: rgba(107,114,128,.95); font-size: 12px; margin-top: 6px; }
 
-  .gp-ghostbtn{
+  .gp-notif__time {
+    color: rgba(107, 114, 128, .95);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+
+  .gp-ghostbtn {
     width: 100%;
     border-radius: 12px;
-    border: 1px solid rgba(148,163,184,0.35);
-    background: rgba(0,0,0,.03);
+    border: 1px solid rgba(148, 163, 184, .35);
+    background: rgba(0, 0, 0, .03);
     color: var(--gp-text);
     padding: 10px 12px;
     font-weight: 900;
-    cursor:pointer;
+    cursor: pointer;
   }
-  .gp-ghostbtn:hover{ background: rgba(0,0,0,.06); }
+
+  .gp-ghostbtn:hover {
+    background: rgba(0, 0, 0, .06);
+  }
 </style>
+{% endif %}
 
 <script>
 (function(){
-  const root = document.getElementById('gpNotifyRoot');
-  const btn = document.getElementById('gpNotifBtn');
-  const menu = document.getElementById('gpNotifMenu');
-  const badge = document.getElementById('gpNotifBadge');
-  const markAllBtn = document.getElementById('gpMarkAllReadBtn');
-  const clearBtn = document.getElementById('gpClearBtn');
+  const root = document.getElementById('gpNotifyRoot-{{ _notif_uid }}');
+  const btn = root?.querySelector('[data-gp-notif-btn]');
+  const menu = root?.querySelector('[data-gp-notif-menu]');
+  const markAllBtn = root?.querySelector('[data-gp-mark-all]');
+  const clearBtn = root?.querySelector('[data-gp-clear]');
 
   if(!root || !btn || !menu) return;
 
@@ -342,29 +420,26 @@
     menu.style.zIndex = '';
   }
 
+  function isMobileHeader(){
+    return !!root.closest('.header-mobile') || window.matchMedia('(max-width: 768px)').matches;
+  }
+
   function positionMenuFixed(){
-    // Só usa posição fixed quando estiver dockado no header-bottom (mobile)
-    const mobileDocked = root.classList.contains('gp-notify--docked');
-    const desktopDocked = root.classList.contains('gp-notify--desktop-docked');
-    const inHeaderActions = !!root.closest('.header-actions');
-    if(!mobileDocked || inHeaderActions || desktopDocked){
-      // limpa estilos inline para voltar ao CSS padrão (absolute)
+    if(!isMobileHeader()){
       clearMenuPosition();
       return;
     }
 
-    // menu precisa estar visível pra medir
     const rectBtn = btn.getBoundingClientRect();
     const rectMenu = menu.getBoundingClientRect();
     const width = rectMenu.width || 340;
-
     const pad = 12;
+
     let left = rectBtn.right - width;
     if(left < pad) left = pad;
     if(left + width > window.innerWidth - pad) left = window.innerWidth - width - pad;
 
     let top = rectBtn.bottom + 10;
-    // se faltar espaço embaixo, tenta abrir pra cima
     const menuHeight = rectMenu.height || 300;
     if(top + menuHeight > window.innerHeight - pad){
       const upTop = rectBtn.top - menuHeight - 10;
@@ -380,98 +455,48 @@
   }
 
   function openMenu(){
+    document.querySelectorAll('.gp-menu.is-open').forEach((openMenuEl) => {
+      if(openMenuEl !== menu){
+        openMenuEl.classList.remove('is-open');
+        const otherRoot = openMenuEl.closest('[data-gp-notify-root]');
+        const otherBtn = otherRoot?.querySelector('[data-gp-notif-btn]');
+        if(otherBtn) otherBtn.setAttribute('aria-expanded', 'false');
+      }
+    });
+
     menu.classList.add('is-open');
     btn.setAttribute('aria-expanded', 'true');
-    // posiciona depois de abrir (medição correta)
     requestAnimationFrame(positionMenuFixed);
   }
+
   function closeMenu(){
     menu.classList.remove('is-open');
     btn.setAttribute('aria-expanded', 'false');
-    // limpa posição fixed se quiser (não é obrigatório)
+    clearMenuPosition();
   }
+
   function toggleMenu(){
     menu.classList.contains('is-open') ? closeMenu() : openMenu();
   }
 
-  btn.addEventListener('click', (e) => {
-    e.stopPropagation();
+  btn.addEventListener('click', (event) => {
+    event.stopPropagation();
     toggleMenu();
   });
 
-  document.addEventListener('click', (e) => {
-    if(menu.classList.contains('is-open')){
-      const inside = menu.contains(e.target) || btn.contains(e.target);
-      if(!inside) closeMenu();
-    }
+  document.addEventListener('click', (event) => {
+    if(!menu.classList.contains('is-open')) return;
+    const inside = menu.contains(event.target) || btn.contains(event.target);
+    if(!inside) closeMenu();
   });
 
-  document.addEventListener('keydown', (e) => {
-    if(e.key === 'Escape') closeMenu();
+  document.addEventListener('keydown', (event) => {
+    if(event.key === 'Escape') closeMenu();
   });
 
-  // Reposiciona se redimensionar enquanto aberto
   window.addEventListener('resize', () => {
     if(menu.classList.contains('is-open')) positionMenuFixed();
   });
-
-  /* ✅ MOBILE: encaixa ao lado do Home dentro do .header-bottom */
-  const mq = window.matchMedia('(max-width: 768px)');
-  const originalParent = root.parentNode;
-  const originalNext = root.nextSibling;
-
-  function restoreOriginalPosition(){
-    if(!originalParent) return;
-
-    if(originalNext && originalNext.parentNode === originalParent){
-      originalParent.insertBefore(root, originalNext);
-    }else if(root.parentNode !== originalParent){
-      originalParent.appendChild(root);
-    }
-  }
-
-  function dock(){
-    const headerBottom = document.querySelector('.header-bottom');
-    const homeBtn = headerBottom?.querySelector('.btn-home-mobile');
-    const headerDesktop = document.querySelector('.header-desktop');
-    const desktopHomeBtn = headerDesktop?.querySelector('.btn-home');
-
-    if(mq.matches && headerBottom && homeBtn){
-      headerBottom.insertBefore(root, homeBtn);
-      root.classList.add('gp-notify--docked');
-      root.classList.remove('gp-notify--desktop-docked');
-      // garante que o dropdown não herde alinhamento do header
-      headerBottom.style.overflow = 'visible';
-    }else{
-      const originalWasHeaderActions = !!originalParent?.classList?.contains('header-actions');
-
-      if(originalWasHeaderActions){
-        restoreOriginalPosition();
-        root.classList.remove('gp-notify--docked', 'gp-notify--desktop-docked');
-      }else if(headerDesktop){
-        if(desktopHomeBtn){
-          headerDesktop.insertBefore(root, desktopHomeBtn);
-        }else{
-          headerDesktop.appendChild(root);
-        }
-        root.classList.remove('gp-notify--docked');
-        root.classList.add('gp-notify--desktop-docked');
-        headerDesktop.style.overflow = 'visible';
-      }else{
-        restoreOriginalPosition();
-        root.classList.remove('gp-notify--docked', 'gp-notify--desktop-docked');
-      }
-      // volta ao comportamento padrão de posicionamento
-      positionMenuFixed();
-    }
-  }
-
-  dock();
-  if(mq.addEventListener){
-    mq.addEventListener('change', dock);
-  }else if(mq.addListener){
-    mq.addListener(dock);
-  }
 
   const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 
@@ -485,16 +510,37 @@
       },
       body: JSON.stringify({})
     });
-    return res.ok ? res.json().catch(()=> ({})) : null;
+    return res.ok ? res.json().catch(() => ({})) : null;
+  }
+
+  function syncReadUI(){
+    document.querySelectorAll('[data-gp-notif-badge]').forEach((el) => {
+      el.style.display = 'none';
+      el.textContent = '0';
+    });
+    document.querySelectorAll('[data-gp-mark-all]').forEach((el) => {
+      el.disabled = true;
+    });
+    document.querySelectorAll('.gp-notif.is-unread').forEach((el) => {
+      el.classList.remove('is-unread');
+    });
+  }
+
+  function syncEmptyUI(){
+    document.querySelectorAll('[data-gp-notif-list]').forEach((list) => {
+      list.innerHTML = `
+        <div class="gp-empty">
+          <div class="gp-empty__title">Nada por aqui</div>
+          <div class="gp-empty__sub">Quando houver novidades, elas aparecem aqui.</div>
+        </div>`;
+    });
   }
 
   if(markAllBtn){
     markAllBtn.addEventListener('click', async () => {
       const data = await postJSON('/notifications/mark_all_read');
       if(data && data.ok){
-        if(badge){ badge.style.display = 'none'; badge.textContent = '0'; }
-        markAllBtn.disabled = true;
-        menu.querySelectorAll('.gp-notif.is-unread').forEach(el => el.classList.remove('is-unread'));
+        syncReadUI();
       }
     });
   }
@@ -503,16 +549,8 @@
     clearBtn.addEventListener('click', async () => {
       const data = await postJSON('/notifications/clear');
       if(data && data.ok){
-        if(badge){ badge.style.display = 'none'; badge.textContent = '0'; }
-        if(markAllBtn) markAllBtn.disabled = true;
-        const list = document.getElementById('gpNotifList');
-        if(list){
-          list.innerHTML = `
-            <div class="gp-empty">
-              <div class="gp-empty__title">Nada por aqui</div>
-              <div class="gp-empty__sub">Quando houver novidades, elas aparecem aqui.</div>
-            </div>`;
-        }
+        syncReadUI();
+        syncEmptyUI();
       }
     });
   }

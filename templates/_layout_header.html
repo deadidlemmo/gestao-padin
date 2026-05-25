@@ -24,6 +24,7 @@
       </button>
     {% endif %}
 
+    {% set notification_instance = 'desktop' %}
     {% include "header_notifications.html" %}
 
     <a href="{{ url_for(_home_endpoint) }}" class="btn-home" title="{{ _home_title }}">
@@ -49,6 +50,9 @@
         <span>Imprimir</span>
       </button>
     {% endif %}
+
+    {% set notification_instance = 'mobile' %}
+    {% include "header_notifications.html" %}
 
     <a href="{{ url_for(_home_endpoint) }}" class="btn-home-mobile" title="{{ _home_title }}">
       <i class="fas fa-home" aria-hidden="true"></i>
