@@ -370,22 +370,63 @@
     }
     .checkbox-row{
       display:flex;
-      align-items:flex-start;
+      align-items:center;
       gap:10px;
+      cursor:pointer;
     }
-    .checkbox-row input[type="checkbox"]{
+    .whatsapp-toggle-input{
+      position:absolute !important;
+      opacity:0;
+      width:1px !important;
+      height:1px !important;
+      padding:0 !important;
+      border:0 !important;
+      margin:0 !important;
+      pointer-events:none;
+    }
+    .whatsapp-toggle-control{
+      position:relative;
+      width:46px;
+      height:26px;
+      border-radius:999px;
+      background:#cbd5e1;
+      border:1px solid #94a3b8;
+      box-shadow:inset 0 1px 2px rgba(15,23,42,.18);
+      flex:0 0 46px;
+      transition:background-color .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .whatsapp-toggle-control::after{
+      content:"";
+      position:absolute;
+      left:3px;
+      top:3px;
       width:18px;
       height:18px;
-      margin-top:2px;
-      accent-color:var(--brand);
-      flex-shrink:0;
+      border-radius:50%;
+      background:#fff;
+      box-shadow:0 2px 6px rgba(15,23,42,.25);
+      transition:transform .18s ease;
     }
-    .checkbox-row label{
+    .whatsapp-toggle-input:checked + .whatsapp-toggle-control{
+      background:var(--brand);
+      border-color:#0b5ed7;
+      box-shadow:0 6px 16px rgba(13,110,253,.28);
+    }
+    .whatsapp-toggle-input:checked + .whatsapp-toggle-control::after{
+      transform:translateX(20px);
+    }
+    .whatsapp-toggle-input:focus-visible + .whatsapp-toggle-control{
+      outline:3px solid rgba(13,110,253,.25);
+      outline-offset:2px;
+    }
+    .whatsapp-toggle-text{
       margin:0;
       line-height:1.35;
+      font-weight:800;
+      color:#111827;
     }
     .checkbox-note{
-      margin:0 0 0 28px;
+      margin:0 0 0 56px;
       color:var(--muted);
       font-size:0.82rem;
       line-height:1.35;
@@ -738,12 +779,13 @@
           </div>
 
           <div class="form-group full-width checkbox-field">
-            <div class="checkbox-row">
-              <input type="checkbox" id="whatsapp_opt_in" name="whatsapp_opt_in">
-              <label for="whatsapp_opt_in">
+            <label class="checkbox-row" for="whatsapp_opt_in">
+              <input class="whatsapp-toggle-input" type="checkbox" id="whatsapp_opt_in" name="whatsapp_opt_in">
+              <span class="whatsapp-toggle-control" aria-hidden="true"></span>
+              <span class="whatsapp-toggle-text">
                 Receber avisos pelo WhatsApp
-              </label>
-            </div>
+              </span>
+            </label>
             <div class="checkbox-note">
               As mensagens serao apenas avisos genericos para consultar o Portal do Servidor. Os detalhes permanecem dentro do sistema.
             </div>
