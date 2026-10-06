@@ -1,12 +1,28 @@
 # Folga System
 
-**Uma central para organizar solicitações e rotinas administrativas da unidade escolar.** Servidores acompanham pedidos; administradores analisam registros, gerenciam saldos e emitem relatórios.
+<p align="center">
+  <img src="assets/readme-cover.svg" alt="Folga System — gestão de pessoas e rotinas escolares" width="100%" />
+</p>
 
-[Visão geral](#visao-geral) · [Funcionalidades](#funcionalidades) · [Como executar](#como-executar) · [Segurança](#seguranca-e-pontos-de-atencao)
+<p align="center"><strong>Solicitações, saldos e relatórios da unidade escolar em um só lugar.</strong></p>
 
-| Fluxos principais | Base técnica |
-| --- | --- |
-| Folgas, banco de horas, TRE, justificativas, eventos e relatórios | Python, Flask, SQLAlchemy, templates HTML e geração de PDF |
+<p align="center">
+  <a href="#funcionalidades">Funcionalidades</a> ·
+  <a href="#arquitetura">Arquitetura</a> ·
+  <a href="#como-executar">Executar localmente</a> ·
+  <a href="#seguranca-e-pontos-de-atencao">Segurança</a>
+</p>
+
+## Em resumo
+
+O Folga System organiza o atendimento interno da unidade escolar. Servidores registram e acompanham solicitações; a administração analisa pedidos, controla saldos, publica avisos e gera relatórios.
+
+- **Solicitações:** folgas, justificativas, licença médica e esquecimento de ponto.
+- **Controle:** banco de horas e TRE com fluxos de análise e acompanhamento.
+- **Gestão:** calendário, eventos, cadastros e comunicação com a equipe.
+- **Relatórios:** visão de ponto, horas extras e prontuários em PDF.
+
+O sistema é de **uso interno** e não possui demonstração pública nesta documentação. Os exemplos abaixo são técnicos e não exigem dados reais de servidores.
 
 Sistema web Flask para gestao interna de folgas, justificativas, TRE, banco de horas, relatorios e cadastros de servidores da unidade escolar.
 
