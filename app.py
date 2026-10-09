@@ -4392,12 +4392,9 @@ def admin_agendar_para():
 
                 novo_agendamento = Agendamento(**ag_kwargs)
 
-                # ✅ Se BH, aplica o mesmo efeito do /deferir_folgas
+                # Se BH, registra movimento de consumo. O saldo usado pelo sistema
+                # vem do cálculo dos movimentos, não do cache salvo no usuário.
                 if tipo_folga == "BH":
-                    usuario_alvo.banco_horas = int(usuario_alvo.banco_horas or 0) - int(
-                        total_minutos
-                    )
-
                     novo_banco_horas = BancoDeHoras(
                         funcionario_id=usuario_alvo.id,
                         horas=horas or 0,
@@ -4411,6 +4408,15 @@ def admin_agendar_para():
                     db.session.add(novo_banco_horas)
 
                 db.session.add(novo_agendamento)
+                if tipo_folga == "BH":
+                    usuario_alvo.banco_horas = max(
+                        0,
+                        int(
+                            _calcular_bh_usuario(usuario_alvo.id, usuario_alvo)[
+                                "saldo_calculado_min"
+                            ]
+                        ),
+                    )
                 db.session.commit()
 
                 # ✅ Após deferir TRE via agendamento, sincroniza saldo
@@ -5815,13 +5821,12 @@ def deferir_folgas():
         else:
             folga_principal = folga
 
-        # Banco de horas: ao deferir, debita saldo e registra movimento (mantém como era)
+        # Banco de horas: ao deferir, registra movimento de consumo.
         # (não aplica para lote LM)
         if not lote_regs and folga.motivo == "BH" and novo_status == "deferido":
             total_minutos = (folga.horas or 0) * 60 + (folga.minutos or 0)
             resumo_bh = _calcular_bh_usuario(usuario.id, usuario)
             if resumo_bh["saldo_disponivel_min"] >= total_minutos:
-                usuario.banco_horas -= total_minutos
                 novo_banco_horas = BancoDeHoras(
                     funcionario_id=usuario.id,
                     horas=folga.horas or 0,
@@ -5846,6 +5851,14 @@ def deferir_folgas():
                 ag.status = novo_status
         else:
             folga.status = novo_status
+
+        if not lote_regs and folga_principal.motivo == "BH" and novo_status == "deferido":
+            usuario.banco_horas = max(
+                0,
+                int(
+                    _calcular_bh_usuario(usuario.id, usuario)["saldo_calculado_min"]
+                ),
+            )
 
         try:
             db.session.commit()
@@ -6989,8 +7002,8 @@ def _calcular_bh_usuario(funcionario_id: int, usuario=None):
     debitos_min = int(debitos_min)
     saldo_calculado_min = creditos_min - debitos_min
 
-    # Regra conservadora: nao mostrar nem permitir uso acima do menor saldo conhecido.
-    saldo_disponivel_min = max(0, min(saldo_salvo_min, saldo_calculado_min))
+    # Fonte da verdade: movimentos deferidos de crédito menos folgas BH deferidas.
+    saldo_disponivel_min = max(0, saldo_calculado_min)
 
     horas_deferidas, minutos_deferidos = _split_minutos_positivos(creditos_min)
     horas_em_espera, minutos_em_espera = _split_minutos_positivos(pendentes_min)
@@ -7021,7 +7034,6 @@ def _calcular_bh_usuario(funcionario_id: int, usuario=None):
 def _classificar_auditoria_bh(resumo_bh):
     saldo_salvo = int(resumo_bh["saldo_salvo_min"])
     saldo_calculado = int(resumo_bh["saldo_calculado_min"])
-    saldo_seguro = int(resumo_bh["saldo_disponivel_min"])
     diferenca = saldo_salvo - saldo_calculado
 
     if saldo_calculado < 0:
@@ -7034,22 +7046,22 @@ def _classificar_auditoria_bh(resumo_bh):
     if diferenca > 0:
         return {
             "key": "saldo_salvo_maior",
-            "label": "Saldo salvo maior",
+            "label": "Cache salvo maior",
             "tone": "warning",
-            "detail": "O saldo gravado no usuário é maior que o saldo recalculado.",
+            "detail": "O cache salvo no usuário é maior que o saldo real calculado.",
         }
     if diferenca < 0:
         return {
             "key": "saldo_salvo_menor",
-            "label": "Saldo salvo menor",
+            "label": "Cache salvo menor",
             "tone": "info",
-            "detail": "O saldo gravado no usuário é menor que o saldo recalculado.",
+            "detail": "O cache salvo no usuário é menor que o saldo real calculado.",
         }
     return {
         "key": "ok",
         "label": "OK",
         "tone": "success",
-        "detail": "Saldo salvo e cálculo conferem.",
+        "detail": "Cache salvo e saldo real conferem.",
     }
 
 
@@ -7165,8 +7177,8 @@ def auditoria_banco_horas():
     filtros = [
         ("divergentes", "Divergentes"),
         ("todos", "Todos"),
-        ("saldo_salvo_maior", "Saldo salvo maior"),
-        ("saldo_salvo_menor", "Saldo salvo menor"),
+        ("saldo_salvo_maior", "Cache salvo maior"),
+        ("saldo_salvo_menor", "Cache salvo menor"),
         ("calculado_negativo", "Uso maior que créditos"),
         ("ok", "OK"),
     ]
@@ -7189,7 +7201,7 @@ import datetime as dt
 
 
 def _recalcular_saldo_minutos(funcionario_id: int):
-    saldo = int(_calcular_bh_usuario(funcionario_id)["saldo_calculado_min"])
+    saldo = max(0, int(_calcular_bh_usuario(funcionario_id)["saldo_calculado_min"]))
     u = User.query.get(funcionario_id)
     if u:
         u.banco_horas = saldo
@@ -7279,9 +7291,14 @@ def inserir_bh_admin():
         return redirect(url_for("inserir_bh_admin"))
 
     usuarios = User.query.filter(User.ativo.is_(True)).order_by(User.nome.asc()).all()
+    saldos_bh = {
+        u.id: int(_calcular_bh_usuario(u.id, u)["saldo_disponivel_min"])
+        for u in usuarios
+    }
     return render_template(
         "inserir_bh_admin.html",
         usuarios=usuarios,
+        saldos_bh=saldos_bh,
         hoje=dt.date.today(),
         padrao_status="Deferido",
     )
@@ -7487,9 +7504,6 @@ def deferir_horas():
         # Status/decisão
         if action == "deferir":
             banco_horas.status = "Deferido"
-            funcionario.banco_horas = int(funcionario.banco_horas or 0) + int(
-                banco_horas.total_minutos or 0
-            )
             decisao = "DEFERIDO"
             badge = "<span style='font-weight:800;color:#16A34A;'>DEFERIDO</span>"
             flash(
@@ -7507,6 +7521,15 @@ def deferir_horas():
         else:
             flash("Ação inválida.", "danger")
             return redirect(url_for("deferir_horas"))
+
+        funcionario.banco_horas = max(
+            0,
+            int(
+                _calcular_bh_usuario(funcionario.id, funcionario)[
+                    "saldo_calculado_min"
+                ]
+            ),
+        )
 
         try:
             db.session.commit()
@@ -8829,6 +8852,9 @@ def user_info_all():
         if saldo_tre < 0:
             saldo_tre = 0
 
+        bh_resumo = _calcular_bh_usuario(u.id, u)
+        bh_saldo_min = int(bh_resumo["saldo_disponivel_min"])
+
         resumos[u.id] = {
             "abonadas_total": ABONADAS_POR_ANO,
             "abonadas_usadas": 0,
@@ -8837,7 +8863,8 @@ def user_info_all():
             "tre_registros": int(total_tre),
             "tre_saldo_horas": float(saldo_tre),
             "bh_registros": 0,  # compat/legado
-            "bh_saldo_horas": 0.0,  # compat/legado
+            "bh_saldo_horas": float(bh_saldo_min / 60),  # compat/legado
+            "bh_saldo_min": bh_saldo_min,
             "tre_agendamentos": [],
             "bh_agendamentos": [],
         }
@@ -10547,7 +10574,7 @@ def _build_report_items(
         tre_usuf = int(getattr(u, "tre_usufruidas", 0) or 0)
         tre_saldo = max(tre_total - tre_usuf, 0)
 
-        bh_min = int(getattr(u, "banco_horas", 0) or 0)
+        bh_min = int(_calcular_bh_usuario(u.id, u)["saldo_disponivel_min"])
         bh_saldo_str = _format_bh_saldo(bh_min)
 
         dados = {

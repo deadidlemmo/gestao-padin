@@ -153,7 +153,7 @@
             {% set tre_ag = r.get('tre_agendamentos', []) %}
             {% set bh_ag  = r.get('bh_agendamentos', []) %}
 
-            {% set bh_total_min = user.banco_horas or 0 %}
+            {% set bh_total_min = r.get('bh_saldo_min', user.banco_horas or 0) %}
             {% set bh_horas = (bh_total_min // 60) | int %}
             {% set bh_min   = (bh_total_min % 60) | int %}
 

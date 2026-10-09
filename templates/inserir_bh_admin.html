@@ -218,7 +218,7 @@
                     value="{{ u.id }}"
                     data-registro="{{ u.registro }}"
                     data-email="{{ u.email }}"
-                    data-saldo="{{ u.banco_horas or 0 }}"
+                    data-saldo="{{ saldos_bh.get(u.id, 0) if saldos_bh is defined else (u.banco_horas or 0) }}"
                   >
                     {{ u.nome }} — {{ u.registro }} — {{ u.email }}
                   </option>

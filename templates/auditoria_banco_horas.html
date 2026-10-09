@@ -472,7 +472,7 @@
         <div>
           <h1 class="heading-title">Auditoria de Banco de Horas</h1>
           <p class="heading-subtitle">
-            Conferência entre saldo salvo, créditos deferidos, horas usufruídas e saldo seguro usado no agendamento.
+            Conferência entre cache salvo, créditos deferidos, horas usufruídas e saldo real usado no agendamento.
           </p>
         </div>
       </div>
@@ -504,9 +504,9 @@
         <div class="metric-note">{{ totais.ok }} servidor(es) sem diferença.</div>
       </div>
       <div class="metric">
-        <div class="metric-label"><i class="fas fa-shield-alt"></i> Saldo Seguro</div>
+        <div class="metric-label"><i class="fas fa-shield-alt"></i> Saldo Real</div>
         <div class="metric-value">{{ totais.saldo_seguro_total }}</div>
-        <div class="metric-note">Soma do saldo que o sistema permite usar.</div>
+        <div class="metric-note">Soma do saldo calculado que o sistema permite usar.</div>
       </div>
       <div class="metric">
         <div class="metric-label"><i class="fas fa-not-equal"></i> Diferença Total</div>
@@ -557,9 +557,9 @@
                 <th>Créditos Deferidos</th>
                 <th>Usufruído</th>
                 <th>Pendente</th>
-                <th>Saldo Salvo</th>
+                <th>Cache Salvo</th>
                 <th>Saldo Calculado</th>
-                <th>Saldo Seguro</th>
+                <th>Saldo Real Usado</th>
                 <th>Diferença</th>
                 <th>Situação</th>
               </tr>
