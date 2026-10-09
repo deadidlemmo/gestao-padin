@@ -131,6 +131,11 @@
       white-space: nowrap;
     }
 
+    .action-badge {
+      background: var(--primary-soft);
+      color: var(--primary-dark);
+    }
+
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -185,6 +190,87 @@
     .filters-panel {
       padding: 14px;
       margin-bottom: 16px;
+    }
+
+    .sync-panel {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 14px;
+      align-items: center;
+      background: var(--surface);
+      border: 1px solid #bfdbfe;
+      border-radius: var(--radius);
+      box-shadow: 0 8px 22px rgba(15, 23, 42, .07);
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .sync-title {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin: 0 0 5px;
+      color: #0f172a;
+      font-size: .94rem;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    .sync-title i {
+      color: var(--primary);
+    }
+
+    .sync-text {
+      margin: 0;
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 700;
+      line-height: 1.35;
+    }
+
+    .sync-form {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .sync-check {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: #334155;
+      font-size: .78rem;
+      font-weight: 850;
+      white-space: nowrap;
+    }
+
+    .sync-check input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .btn-sync {
+      min-height: 42px;
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 14px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 8px 18px rgba(0, 123, 255, .20);
+    }
+
+    .btn-sync:hover {
+      background: var(--primary-dark);
     }
 
     .filters-form {
@@ -445,6 +531,14 @@
         justify-content: flex-start;
       }
 
+      .sync-panel {
+        grid-template-columns: 1fr;
+      }
+
+      .sync-form {
+        justify-content: flex-start;
+      }
+
       .metrics-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
@@ -474,11 +568,13 @@
 
       .heading-actions,
       .btn-action,
-      .btn-submit {
+      .btn-submit,
+      .btn-sync {
         width: 100%;
       }
 
-      .btn-action {
+      .btn-action,
+      .btn-sync {
         justify-content: center;
       }
 
@@ -505,9 +601,9 @@
         </div>
       </div>
       <div class="heading-actions">
-        <span class="read-only-badge">
-          <i class="fas fa-lock"></i>
-          Somente leitura
+        <span class="read-only-badge action-badge">
+          <i class="fas fa-hand-pointer"></i>
+          Ação manual
         </span>
         <a class="btn-action" href="{{ url_for('banco_horas') }}">
           <i class="fas fa-arrow-left"></i>
@@ -575,6 +671,42 @@
         </button>
       </form>
     </section>
+
+    {% if totais.divergentes > 0 %}
+      <section class="sync-panel" aria-label="Sincronização de saldos divergentes">
+        <div>
+          <p class="sync-title">
+            <i class="fas fa-sync-alt"></i>
+            Sincronizar saldos divergentes
+          </p>
+          <p class="sync-text">
+            Atualiza apenas o saldo registrado para o saldo real liberado. Não cria horas novas, não remove lançamentos
+            e não altera o histórico de folgas.
+          </p>
+        </div>
+        <form
+          class="sync-form"
+          method="POST"
+          action="{{ url_for('sincronizar_auditoria_banco_horas') }}"
+          onsubmit="return confirm('Sincronizar os saldos divergentes com o saldo real calculado? Esta ação altera apenas o saldo registrado dos usuários filtrados.');"
+        >
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="q" value="{{ busca }}">
+          <input type="hidden" name="filtro" value="{{ filtro }}">
+          {% if incluir_inativos %}
+            <input type="hidden" name="inativos" value="1">
+          {% endif %}
+          <label class="sync-check">
+            <input type="checkbox" name="confirmar" value="1" required>
+            Confirmo a sincronização
+          </label>
+          <button class="btn-sync" type="submit">
+            <i class="fas fa-sync-alt"></i>
+            Sincronizar {{ totais.divergentes }}
+          </button>
+        </form>
+      </section>
+    {% endif %}
 
     <section class="table-panel" aria-label="Resultado da auditoria">
       <div class="table-header">

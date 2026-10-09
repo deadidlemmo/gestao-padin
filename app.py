@@ -7194,6 +7194,74 @@ def auditoria_banco_horas():
     )
 
 
+@app.route("/banco_horas/auditoria/sincronizar", methods=["POST"])
+@login_required
+def sincronizar_auditoria_banco_horas():
+    if current_user.tipo != "administrador":
+        flash("Acesso negado. Você não tem permissão para sincronizar saldos.", "danger")
+        return redirect(url_for("banco_horas"))
+
+    if request.form.get("confirmar") != "1":
+        flash("Confirme a sincronização antes de atualizar os saldos registrados.", "warning")
+        return redirect(url_for("auditoria_banco_horas"))
+
+    busca = (request.form.get("q") or "").strip()
+    filtro = (request.form.get("filtro") or "divergentes").strip()
+    incluir_inativos = request.form.get("inativos") == "1"
+
+    query = User.query
+    if not incluir_inativos:
+        query = query.filter(User.ativo.is_(True))
+    if busca:
+        termo = f"%{busca}%"
+        query = query.filter(
+            or_(
+                User.nome.ilike(termo),
+                User.registro.ilike(termo),
+                User.email.ilike(termo),
+            )
+        )
+
+    usuarios = query.order_by(User.nome.asc()).all()
+    alterados = 0
+
+    try:
+        for usuario in usuarios:
+            resumo_bh = _calcular_bh_usuario(usuario.id, usuario)
+            saldo_registrado = int(usuario.banco_horas or 0)
+            saldo_real = int(resumo_bh["saldo_disponivel_min"])
+            if saldo_registrado != saldo_real:
+                usuario.banco_horas = saldo_real
+                alterados += 1
+
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        app.logger.exception("Erro ao sincronizar saldos divergentes de Banco de Horas")
+        flash("Não foi possível sincronizar os saldos. Tente novamente ou verifique os logs.", "danger")
+        return redirect(
+            url_for(
+                "auditoria_banco_horas",
+                q=busca,
+                filtro=filtro,
+                inativos="1" if incluir_inativos else None,
+            )
+        )
+
+    flash(
+        f"{alterados} saldo(s) divergente(s) sincronizado(s) com o saldo real calculado.",
+        "success",
+    )
+    return redirect(
+        url_for(
+            "auditoria_banco_horas",
+            q=busca,
+            filtro=filtro,
+            inativos="1" if incluir_inativos else None,
+        )
+    )
+
+
 # ============================
 # INSERIR BANCO DE HORAS (ADMIN)
 # ============================
