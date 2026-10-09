@@ -8200,6 +8200,7 @@ def relatorio_horas_extras():
     fim = _parse_date(request.args.get("fim"))
     if inicio and fim and fim < inicio:
         inicio, fim = fim, inicio
+    periodo_filtrado = bool(inicio or fim)
 
     usuarios = (
         User.query.options(selectinload(User.banco_de_horas))
@@ -8211,7 +8212,12 @@ def relatorio_horas_extras():
 
     ags_all = (
         Agendamento.query.filter(Agendamento.funcionario_id.in_(user_ids))
-        .filter(func.lower(func.trim(Agendamento.motivo)) == "bh")
+        .filter(
+            or_(
+                func.lower(func.trim(Agendamento.motivo)) == "bh",
+                func.lower(func.trim(Agendamento.tipo_folga)) == "bh",
+            )
+        )
         .all()
     )
     ags_by_user = defaultdict(list)
@@ -8280,7 +8286,13 @@ def relatorio_horas_extras():
 
         ag_rows.sort(key=lambda x: x["data"] or dt.date.min, reverse=True)
 
-        saldo_min = max(0, total_cadastradas_min - total_usufruidas_min)
+        if periodo_filtrado:
+            saldo_min = max(0, total_cadastradas_min - total_usufruidas_min)
+        else:
+            resumo_bh = _calcular_bh_usuario(u.id, u)
+            total_cadastradas_min = int(resumo_bh["creditos_min"])
+            total_usufruidas_min = int(resumo_bh["debitos_min"])
+            saldo_min = int(resumo_bh["saldo_disponivel_min"])
 
         usuarios_relatorio.append(
             {
