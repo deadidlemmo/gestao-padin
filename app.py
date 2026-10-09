@@ -6909,6 +6909,20 @@ def _split_minutos_positivos(total_minutos):
     return total_minutos // 60, total_minutos % 60
 
 
+def _format_bh_minutos(total_minutos, sinal=False):
+    total_minutos = int(total_minutos or 0)
+    prefixo = ""
+    if total_minutos < 0:
+        prefixo = "-"
+    elif sinal and total_minutos > 0:
+        prefixo = "+"
+
+    total_abs = abs(total_minutos)
+    horas = total_abs // 60
+    minutos = total_abs % 60
+    return f"{prefixo}{horas}h {minutos:02d}min"
+
+
 def _bh_credito_minutos_expr():
     fallback_minutos = (func.coalesce(BancoDeHoras.horas, 0) * 60) + func.coalesce(
         BancoDeHoras.minutos, 0
@@ -7004,6 +7018,41 @@ def _calcular_bh_usuario(funcionario_id: int, usuario=None):
     }
 
 
+def _classificar_auditoria_bh(resumo_bh):
+    saldo_salvo = int(resumo_bh["saldo_salvo_min"])
+    saldo_calculado = int(resumo_bh["saldo_calculado_min"])
+    saldo_seguro = int(resumo_bh["saldo_disponivel_min"])
+    diferenca = saldo_salvo - saldo_calculado
+
+    if saldo_calculado < 0:
+        return {
+            "key": "calculado_negativo",
+            "label": "Uso maior que créditos",
+            "tone": "danger",
+            "detail": "O servidor tem mais BH usufruído do que créditos deferidos.",
+        }
+    if diferenca > 0:
+        return {
+            "key": "saldo_salvo_maior",
+            "label": "Saldo salvo maior",
+            "tone": "warning",
+            "detail": "O saldo gravado no usuário é maior que o saldo recalculado.",
+        }
+    if diferenca < 0:
+        return {
+            "key": "saldo_salvo_menor",
+            "label": "Saldo salvo menor",
+            "tone": "info",
+            "detail": "O saldo gravado no usuário é menor que o saldo recalculado.",
+        }
+    return {
+        "key": "ok",
+        "label": "OK",
+        "tone": "success",
+        "detail": "Saldo salvo e cálculo conferem.",
+    }
+
+
 # ===========================================
 # CONSULTAR HORAS (USUÁRIO)
 # ===========================================
@@ -7021,6 +7070,115 @@ def consultar_horas():
         "consultar_horas.html",
         registros=registros,
         **resumo_bh,
+    )
+
+
+@app.route("/banco_horas/auditoria")
+@login_required
+def auditoria_banco_horas():
+    if current_user.tipo != "administrador":
+        flash("Acesso negado. Você não tem permissão para acessar esta auditoria.", "danger")
+        return redirect(url_for("banco_horas"))
+
+    busca = (request.args.get("q") or "").strip()
+    filtro = (request.args.get("filtro") or "divergentes").strip()
+    incluir_inativos = request.args.get("inativos") == "1"
+
+    query = User.query
+    if not incluir_inativos:
+        query = query.filter(User.ativo.is_(True))
+    if busca:
+        termo = f"%{busca}%"
+        query = query.filter(
+            or_(
+                User.nome.ilike(termo),
+                User.registro.ilike(termo),
+                User.email.ilike(termo),
+            )
+        )
+
+    usuarios = query.order_by(User.nome.asc()).all()
+
+    linhas = []
+    totais = {
+        "consultados": len(usuarios),
+        "exibidos": 0,
+        "ok": 0,
+        "divergentes": 0,
+        "saldo_salvo_maior": 0,
+        "saldo_salvo_menor": 0,
+        "calculado_negativo": 0,
+        "saldo_seguro_total_min": 0,
+        "diferenca_abs_total_min": 0,
+    }
+
+    for usuario in usuarios:
+        resumo_bh = _calcular_bh_usuario(usuario.id, usuario)
+        classificacao = _classificar_auditoria_bh(resumo_bh)
+        key = classificacao["key"]
+        diferenca_min = int(resumo_bh["saldo_salvo_min"]) - int(
+            resumo_bh["saldo_calculado_min"]
+        )
+
+        if key == "ok":
+            totais["ok"] += 1
+        else:
+            totais["divergentes"] += 1
+            if key in totais:
+                totais[key] += 1
+
+        totais["saldo_seguro_total_min"] += int(resumo_bh["saldo_disponivel_min"])
+        totais["diferenca_abs_total_min"] += abs(diferenca_min)
+
+        if filtro == "divergentes" and key == "ok":
+            continue
+        if filtro not in ("todos", "divergentes") and key != filtro:
+            continue
+
+        totais["exibidos"] += 1
+        linhas.append(
+            {
+                "usuario": usuario,
+                "classificacao": classificacao,
+                "creditos": _format_bh_minutos(resumo_bh["creditos_min"]),
+                "usufruido": _format_bh_minutos(resumo_bh["debitos_min"]),
+                "pendente": _format_bh_minutos(resumo_bh["pendentes_min"]),
+                "saldo_salvo": _format_bh_minutos(resumo_bh["saldo_salvo_min"]),
+                "saldo_calculado": _format_bh_minutos(
+                    resumo_bh["saldo_calculado_min"]
+                ),
+                "saldo_seguro": _format_bh_minutos(resumo_bh["saldo_disponivel_min"]),
+                "diferenca": _format_bh_minutos(diferenca_min, sinal=True),
+                "diferenca_min": diferenca_min,
+                "saldo_seguro_min": int(resumo_bh["saldo_disponivel_min"]),
+                "saldo_calculado_min": int(resumo_bh["saldo_calculado_min"]),
+            }
+        )
+
+    totais["saldo_seguro_total"] = _format_bh_minutos(
+        totais["saldo_seguro_total_min"]
+    )
+    totais["diferenca_abs_total"] = _format_bh_minutos(
+        totais["diferenca_abs_total_min"]
+    )
+
+    filtros = [
+        ("divergentes", "Divergentes"),
+        ("todos", "Todos"),
+        ("saldo_salvo_maior", "Saldo salvo maior"),
+        ("saldo_salvo_menor", "Saldo salvo menor"),
+        ("calculado_negativo", "Uso maior que créditos"),
+        ("ok", "OK"),
+    ]
+
+    return render_template(
+        "auditoria_banco_horas.html",
+        linhas=linhas,
+        totais=totais,
+        busca=busca,
+        filtro=filtro,
+        filtros=filtros,
+        incluir_inativos=incluir_inativos,
     )
 
 

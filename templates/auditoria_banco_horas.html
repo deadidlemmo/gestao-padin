@@ -1,0 +1,617 @@
+{% extends "base.html" %}
+
+{% block title %}Auditoria de Banco de Horas{% endblock %}
+
+{% block styles %}
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --surface: #ffffff;
+      --surface-soft: #f8fafc;
+      --border: #d9e2ef;
+      --text: #111827;
+      --muted: #64748b;
+      --primary: #007bff;
+      --primary-dark: #0057c2;
+      --primary-soft: #e6f1ff;
+      --success: #15803d;
+      --success-soft: #dcfce7;
+      --warning: #b45309;
+      --warning-soft: #fef3c7;
+      --danger: #b91c1c;
+      --danger-soft: #fee2e2;
+      --info: #0369a1;
+      --info-soft: #e0f2fe;
+      --shadow: 0 14px 34px rgba(15, 23, 42, .10), 0 2px 4px rgba(15, 23, 42, .06);
+      --radius: 12px;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family: 'Montserrat', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    main {
+      padding: 24px 14px 70px;
+    }
+
+    .audit-shell {
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+
+    .page-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+      margin-bottom: 18px;
+    }
+
+    .heading-main {
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .heading-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 10px 24px rgba(0, 123, 255, .22);
+      flex: 0 0 auto;
+    }
+
+    .heading-title {
+      margin: 0;
+      font-size: 1.45rem;
+      font-weight: 800;
+      color: var(--text);
+      line-height: 1.15;
+    }
+
+    .heading-subtitle {
+      margin: 5px 0 0;
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.35;
+    }
+
+    .heading-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: #0f172a;
+      padding: 10px 13px;
+      font-size: .88rem;
+      font-weight: 800;
+      text-decoration: none;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, .06);
+    }
+
+    .btn-action:hover {
+      text-decoration: none;
+      color: var(--primary-dark);
+      border-color: #9cc7ff;
+    }
+
+    .read-only-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      border-radius: 999px;
+      background: var(--success-soft);
+      color: var(--success);
+      padding: 8px 11px;
+      font-size: .78rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .metric {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      box-shadow: 0 6px 18px rgba(15, 23, 42, .06);
+      min-width: 0;
+    }
+
+    .metric-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      margin-bottom: 8px;
+    }
+
+    .metric-value {
+      font-size: 1.45rem;
+      line-height: 1;
+      font-weight: 900;
+      color: var(--text);
+    }
+
+    .metric-note {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: .8rem;
+      font-weight: 700;
+      line-height: 1.25;
+    }
+
+    .filters-panel,
+    .table-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+    }
+
+    .filters-panel {
+      padding: 14px;
+      margin-bottom: 16px;
+    }
+
+    .filters-form {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) 260px auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 0;
+    }
+
+    .form-field label {
+      font-size: .78rem;
+      font-weight: 900;
+      color: #1f2937;
+      margin: 0;
+    }
+
+    .form-field input,
+    .form-field select {
+      width: 100%;
+      border: 1px solid #cbd5e1;
+      border-radius: 9px;
+      min-height: 42px;
+      padding: 9px 11px;
+      font-size: .9rem;
+      font-weight: 700;
+      color: var(--text);
+      background: #fff;
+    }
+
+    .check-field {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .84rem;
+      font-weight: 800;
+      color: #334155;
+      white-space: nowrap;
+    }
+
+    .check-field input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+    }
+
+    .btn-submit {
+      min-height: 42px;
+      border: 0;
+      border-radius: 9px;
+      padding: 10px 15px;
+      background: #0f172a;
+      color: #fff;
+      font-weight: 900;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .table-panel {
+      overflow: hidden;
+    }
+
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      background: var(--surface-soft);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-title {
+      margin: 0;
+      font-size: .98rem;
+      font-weight: 900;
+      color: #0f172a;
+    }
+
+    .table-count {
+      color: var(--muted);
+      font-size: .82rem;
+      font-weight: 800;
+    }
+
+    .table-scroll {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 1120px;
+    }
+
+    th, td {
+      padding: 11px 12px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: middle;
+      text-align: left;
+      font-size: .83rem;
+    }
+
+    th {
+      background: #f8fafc;
+      color: #334155;
+      font-size: .72rem;
+      font-weight: 900;
+      text-transform: uppercase;
+      letter-spacing: .02em;
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: #f8fbff;
+    }
+
+    .server-cell {
+      min-width: 260px;
+    }
+
+    .server-name {
+      display: block;
+      color: #0f172a;
+      font-weight: 900;
+      line-height: 1.25;
+    }
+
+    .server-meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: .76rem;
+      font-weight: 800;
+    }
+
+    .number-cell {
+      white-space: nowrap;
+      font-weight: 900;
+      color: #111827;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .diff-pos {
+      color: var(--warning);
+    }
+
+    .diff-neg {
+      color: var(--info);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: 999px;
+      padding: 6px 9px;
+      font-size: .75rem;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .status-success {
+      background: var(--success-soft);
+      color: var(--success);
+    }
+
+    .status-warning {
+      background: var(--warning-soft);
+      color: var(--warning);
+    }
+
+    .status-danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    .status-info {
+      background: var(--info-soft);
+      color: var(--info);
+    }
+
+    .status-detail {
+      display: block;
+      margin-top: 5px;
+      color: var(--muted);
+      font-size: .74rem;
+      font-weight: 700;
+      line-height: 1.25;
+      max-width: 230px;
+    }
+
+    .empty-state {
+      padding: 34px 18px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .empty-state i {
+      display: block;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+      color: #94a3b8;
+    }
+
+    @media (max-width: 980px) {
+      .page-heading {
+        flex-direction: column;
+      }
+
+      .heading-actions {
+        justify-content: flex-start;
+      }
+
+      .metrics-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .filters-form {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      main {
+        padding: 18px 10px 60px;
+      }
+
+      .heading-main {
+        align-items: flex-start;
+      }
+
+      .heading-title {
+        font-size: 1.18rem;
+      }
+
+      .metrics-grid,
+      .filters-form {
+        grid-template-columns: 1fr;
+      }
+
+      .heading-actions,
+      .btn-action,
+      .btn-submit {
+        width: 100%;
+      }
+
+      .btn-action {
+        justify-content: center;
+      }
+
+      .table-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="audit-shell">
+    <div class="page-heading">
+      <div class="heading-main">
+        <span class="heading-icon" aria-hidden="true">
+          <i class="fas fa-balance-scale"></i>
+        </span>
+        <div>
+          <h1 class="heading-title">Auditoria de Banco de Horas</h1>
+          <p class="heading-subtitle">
+            Conferência entre saldo salvo, créditos deferidos, horas usufruídas e saldo seguro usado no agendamento.
+          </p>
+        </div>
+      </div>
+      <div class="heading-actions">
+        <span class="read-only-badge">
+          <i class="fas fa-lock"></i>
+          Somente leitura
+        </span>
+        <a class="btn-action" href="{{ url_for('banco_horas') }}">
+          <i class="fas fa-arrow-left"></i>
+          Voltar
+        </a>
+        <a class="btn-action" href="{{ url_for('relatorio_horas_extras') }}">
+          <i class="fas fa-file-alt"></i>
+          Relatório
+        </a>
+      </div>
+    </div>
+
+    <div class="metrics-grid" aria-label="Resumo da auditoria">
+      <div class="metric">
+        <div class="metric-label"><i class="fas fa-users"></i> Consultados</div>
+        <div class="metric-value">{{ totais.consultados }}</div>
+        <div class="metric-note">{{ totais.exibidos }} exibido(s) no filtro atual.</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label"><i class="fas fa-exclamation-triangle"></i> Divergentes</div>
+        <div class="metric-value">{{ totais.divergentes }}</div>
+        <div class="metric-note">{{ totais.ok }} servidor(es) sem diferença.</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label"><i class="fas fa-shield-alt"></i> Saldo Seguro</div>
+        <div class="metric-value">{{ totais.saldo_seguro_total }}</div>
+        <div class="metric-note">Soma do saldo que o sistema permite usar.</div>
+      </div>
+      <div class="metric">
+        <div class="metric-label"><i class="fas fa-not-equal"></i> Diferença Total</div>
+        <div class="metric-value">{{ totais.diferenca_abs_total }}</div>
+        <div class="metric-note">Soma absoluta das divergências encontradas.</div>
+      </div>
+    </div>
+
+    <section class="filters-panel" aria-label="Filtros">
+      <form class="filters-form" method="GET" action="{{ url_for('auditoria_banco_horas') }}">
+        <div class="form-field">
+          <label for="q">Buscar servidor</label>
+          <input id="q" type="search" name="q" value="{{ busca }}" placeholder="Nome, RF ou e-mail">
+        </div>
+        <div class="form-field">
+          <label for="filtro">Situação</label>
+          <select id="filtro" name="filtro">
+            {% for value, label in filtros %}
+              <option value="{{ value }}" {% if filtro == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <label class="check-field">
+          <input type="checkbox" name="inativos" value="1" {% if incluir_inativos %}checked{% endif %}>
+          Incluir inativos
+        </label>
+        <button class="btn-submit" type="submit">
+          <i class="fas fa-filter"></i>
+          Filtrar
+        </button>
+      </form>
+    </section>
+
+    <section class="table-panel" aria-label="Resultado da auditoria">
+      <div class="table-header">
+        <h2 class="table-title">Resultado por servidor</h2>
+        <span class="table-count">
+          {{ totais.exibidos }} de {{ totais.consultados }} servidor(es)
+        </span>
+      </div>
+
+      {% if linhas %}
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Servidor</th>
+                <th>Créditos Deferidos</th>
+                <th>Usufruído</th>
+                <th>Pendente</th>
+                <th>Saldo Salvo</th>
+                <th>Saldo Calculado</th>
+                <th>Saldo Seguro</th>
+                <th>Diferença</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for linha in linhas %}
+                {% set cls = 'status-' ~ linha.classificacao.tone %}
+                <tr>
+                  <td class="server-cell">
+                    <span class="server-name">{{ linha.usuario.nome }}</span>
+                    <span class="server-meta">
+                      <span>RF {{ linha.usuario.registro or '-' }}</span>
+                      {% if not linha.usuario.ativo %}
+                        <span>Inativo</span>
+                      {% endif %}
+                    </span>
+                  </td>
+                  <td class="number-cell">{{ linha.creditos }}</td>
+                  <td class="number-cell">{{ linha.usufruido }}</td>
+                  <td class="number-cell muted">{{ linha.pendente }}</td>
+                  <td class="number-cell">{{ linha.saldo_salvo }}</td>
+                  <td class="number-cell">{{ linha.saldo_calculado }}</td>
+                  <td class="number-cell">{{ linha.saldo_seguro }}</td>
+                  <td class="number-cell {% if linha.diferenca_min > 0 %}diff-pos{% elif linha.diferenca_min < 0 %}diff-neg{% endif %}">
+                    {{ linha.diferenca }}
+                  </td>
+                  <td>
+                    <span class="status-pill {{ cls }}">
+                      {% if linha.classificacao.tone == 'success' %}
+                        <i class="fas fa-check"></i>
+                      {% elif linha.classificacao.tone == 'danger' %}
+                        <i class="fas fa-exclamation-triangle"></i>
+                      {% elif linha.classificacao.tone == 'info' %}
+                        <i class="fas fa-info-circle"></i>
+                      {% else %}
+                        <i class="fas fa-history"></i>
+                      {% endif %}
+                      {{ linha.classificacao.label }}
+                    </span>
+                    <span class="status-detail">{{ linha.classificacao.detail }}</span>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="empty-state">
+          <i class="fas fa-circle-check"></i>
+          Nenhum servidor encontrado para o filtro atual.
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

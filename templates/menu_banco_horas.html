@@ -459,6 +459,25 @@
                   <i class="fas fa-info"></i>
                 </button>
               </div>
+
+              <div class="card-shell">
+                <a href="{{ url_for('auditoria_banco_horas') }}" class="card" title="Auditar divergências de saldo de Banco de Horas">
+                  <span class="card-main-icon" aria-hidden="true">
+                    <i class="fas fa-balance-scale"></i>
+                  </span>
+                  Auditoria de Banco de Horas
+                </a>
+                <button
+                  type="button"
+                  class="card-info-btn"
+                  aria-label="Mais informações sobre Auditoria de Banco de Horas"
+                  data-info-title="Auditoria de Banco de Horas"
+                  data-info-icon="fas fa-balance-scale"
+                  data-info-text="Aqui a administração pode comparar saldo salvo, créditos deferidos, horas usufruídas e saldo seguro usado pelo sistema, sem alterar dados do banco."
+                >
+                  <i class="fas fa-info"></i>
+                </button>
+              </div>
             {% endif %}
           </div>
         </div>
