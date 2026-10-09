@@ -395,14 +395,17 @@
                 </thead>
                 <tbody>
                   {% for registro in registros %}
-                    {% if registro.status in ['Deferido', 'Horas a Serem Deferidas', 'Indeferido'] %}
+                    {% set status_norm = (registro.status or '')|lower %}
+                    {% set motivo_norm = (registro.motivo or '')|upper %}
+                    {% set is_pending = registro.status == 'Horas a Serem Deferidas' or 'espera' in status_norm or 'aguard' in status_norm or 'pendent' in status_norm or 'anal' in status_norm %}
+                    {% if motivo_norm != 'BH' and (is_pending or status_norm[:7] == 'deferid' or status_norm[:9] == 'indeferid') %}
                       <tr>
                         <td>{{ registro.data_realizacao.strftime('%d/%m/%Y') }}</td>
                         <td>{{ registro.horas }} horas e {{ registro.minutos }} minutos</td>
                         <td>
-                          {% if registro.status == 'Horas a Serem Deferidas' %}
+                          {% if is_pending %}
                             <span class="status-pill status-em-espera">Aguardando deferimento</span>
-                          {% elif registro.status == 'Indeferido' %}
+                          {% elif status_norm[:9] == 'indeferid' %}
                             <span class="status-pill status-indeferido">Indeferido</span>
                           {% else %}
                             <span class="status-pill status-deferido">Deferido</span>

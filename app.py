@@ -3552,10 +3552,14 @@ def agendar():
                 )
                 return redirect(url_for("agendar"))
 
-            # Saldo suficiente
-            if (usuario.banco_horas or 0) < total_minutos:
+            # Saldo suficiente usando a mesma regra exibida em /consultar_horas.
+            resumo_bh = _calcular_bh_usuario(current_user.id, usuario)
+            if resumo_bh["saldo_disponivel_min"] < total_minutos:
+                saldo_h, saldo_m = _split_minutos_positivos(
+                    resumo_bh["saldo_disponivel_min"]
+                )
                 flash(
-                    "Você não possui horas suficientes no banco de horas para este agendamento.",
+                    f"Você não possui horas suficientes no banco de horas para este agendamento. Saldo disponível: {saldo_h}h {saldo_m:02d}min.",
                     "danger",
                 )
                 return redirect(url_for("agendar"))
@@ -4289,9 +4293,13 @@ def admin_agendar_para():
                 )
                 return redirect(url_for("admin_agendar_para"))
 
-            if (usuario_alvo.banco_horas or 0) < total_minutos:
+            resumo_bh = _calcular_bh_usuario(usuario_alvo.id, usuario_alvo)
+            if resumo_bh["saldo_disponivel_min"] < total_minutos:
+                saldo_h, saldo_m = _split_minutos_positivos(
+                    resumo_bh["saldo_disponivel_min"]
+                )
                 flash(
-                    "Este usuário não possui horas suficientes no banco de horas para este agendamento.",
+                    f"Este usuário não possui horas suficientes no banco de horas para este agendamento. Saldo disponível: {saldo_h}h {saldo_m:02d}min.",
                     "danger",
                 )
                 return redirect(url_for("admin_agendar_para"))
@@ -5811,7 +5819,8 @@ def deferir_folgas():
         # (não aplica para lote LM)
         if not lote_regs and folga.motivo == "BH" and novo_status == "deferido":
             total_minutos = (folga.horas or 0) * 60 + (folga.minutos or 0)
-            if (usuario.banco_horas or 0) >= total_minutos:
+            resumo_bh = _calcular_bh_usuario(usuario.id, usuario)
+            if resumo_bh["saldo_disponivel_min"] >= total_minutos:
                 usuario.banco_horas -= total_minutos
                 novo_banco_horas = BancoDeHoras(
                     funcionario_id=usuario.id,
@@ -6378,7 +6387,8 @@ def historico():
     tre_usufruidas = int(usuario.tre_usufruidas or 0)
     tre_restantes = max(tre_total - tre_usufruidas, 0)
 
-    total_minutos = int(usuario.banco_horas or 0)
+    resumo_bh = _calcular_bh_usuario(current_user.id, usuario)
+    total_minutos = int(resumo_bh["saldo_disponivel_min"])
     horas = total_minutos // 60
     minutos = total_minutos % 60
     banco_horas_formatado = f"{horas}h {minutos}min" if total_minutos > 0 else "0h 0min"
@@ -6699,8 +6709,12 @@ def cadastrar_horas():
             try:
                 usuario = User.query.get(current_user.id)
 
-                # Saldo atual a usufruir (minutos) — NÃO muda no cadastro, só após deferimento
-                saldo_atual_min = int(getattr(usuario, "banco_horas", 0) or 0)
+                # Saldo atual a usufruir (minutos) — mesma regra exibida ao usuário
+                saldo_atual_min = int(
+                    _calcular_bh_usuario(current_user.id, usuario)[
+                        "saldo_disponivel_min"
+                    ]
+                )
 
                 # Em espera (minutos e quantidade) — inclui este lançamento recém-commitado
                 pendentes_min = (
@@ -6879,70 +6893,6 @@ def banco_horas():
     return render_template("menu_banco_horas.html", is_admin=is_admin)
 
 
-# ===========================================
-# CONSULTAR HORAS (USUÁRIO)
-# ===========================================
-@app.route("/consultar_horas")
-@login_required
-def consultar_horas():
-    registros = (
-        BancoDeHoras.query.filter_by(funcionario_id=current_user.id)
-        .order_by(BancoDeHoras.data_realizacao.desc())
-        .all()
-    )
-
-    horas_deferidas = 0
-    minutos_deferidos = 0
-    horas_em_espera = 0
-    minutos_em_espera = 0
-
-    for registro in registros:
-        h = registro.horas or 0
-        m = registro.minutos or 0
-
-        if registro.status == "Deferido":
-            horas_deferidas += h
-            minutos_deferidos += m
-        elif registro.status == "Horas a Serem Deferidas":
-            horas_em_espera += h
-            minutos_em_espera += m
-
-    horas_deferidas += minutos_deferidos // 60
-    minutos_deferidos = minutos_deferidos % 60
-
-    horas_em_espera += minutos_em_espera // 60
-    minutos_em_espera = minutos_em_espera % 60
-
-    saldo_min = int(current_user.banco_horas or 0)
-    total_deferidas_min = horas_deferidas * 60 + minutos_deferidos
-
-    usadas_min = max(total_deferidas_min - saldo_min, 0)
-    horas_usufruidas = usadas_min // 60
-    minutos_usufruidos = usadas_min % 60
-
-    horas_a_usufruir = saldo_min // 60
-    minutos_a_usufruir = saldo_min % 60
-
-    return render_template(
-        "consultar_horas.html",
-        registros=registros,
-        horas_deferidas=horas_deferidas,
-        minutos_deferidos=minutos_deferidos,
-        horas_em_espera=horas_em_espera,
-        minutos_em_espera=minutos_em_espera,
-        horas_usufruidas=horas_usufruidas,
-        minutos_usufruidos=minutos_usufruidos,
-        horas_a_usufruir=horas_a_usufruir,
-        minutos_a_usufruir=minutos_a_usufruir,
-    )
-
-
-# ============================
-# INSERIR BANCO DE HORAS (ADMIN)
-# ============================
-import datetime as dt
-
-
 def _normalize_status_bh(raw: str) -> str:
     s = (raw or "").strip().lower()
     if s.startswith("deferid") or s in {"aprovado", "aprovada"}:
@@ -6954,28 +6904,134 @@ def _normalize_status_bh(raw: str) -> str:
     return "Em análise"
 
 
-def _recalcular_saldo_minutos(funcionario_id: int):
+def _split_minutos_positivos(total_minutos):
+    total_minutos = max(int(total_minutos or 0), 0)
+    return total_minutos // 60, total_minutos % 60
+
+
+def _bh_credito_minutos_expr():
+    fallback_minutos = (func.coalesce(BancoDeHoras.horas, 0) * 60) + func.coalesce(
+        BancoDeHoras.minutos, 0
+    )
+    return case(
+        (func.coalesce(BancoDeHoras.total_minutos, 0) != 0, BancoDeHoras.total_minutos),
+        else_=fallback_minutos,
+    )
+
+
+def _agendamento_bh_minutos_expr():
+    return (func.coalesce(Agendamento.horas, 0) * 60) + func.coalesce(
+        Agendamento.minutos, 0
+    )
+
+
+def _calcular_bh_usuario(funcionario_id: int, usuario=None):
+    """Calcula o saldo de BH sem gravar nada no banco."""
+    usuario = usuario or User.query.get(funcionario_id)
+    saldo_salvo_min = int(getattr(usuario, "banco_horas", 0) or 0)
+
     creditos_min = (
-        db.session.query(
-            func.coalesce(func.sum(BancoDeHoras.horas * 60 + BancoDeHoras.minutos), 0)
-        )
+        db.session.query(func.coalesce(func.sum(_bh_credito_minutos_expr()), 0))
         .filter(BancoDeHoras.funcionario_id == funcionario_id)
         .filter(func.lower(BancoDeHoras.status).like("deferid%"))
-        .filter(func.upper(BancoDeHoras.motivo) != "BH")
+        .filter(func.upper(func.coalesce(BancoDeHoras.motivo, "")) != "BH")
         .scalar()
+        or 0
+    )
+
+    pendentes_min = (
+        db.session.query(func.coalesce(func.sum(_bh_credito_minutos_expr()), 0))
+        .filter(BancoDeHoras.funcionario_id == funcionario_id)
+        .filter(
+            or_(
+                BancoDeHoras.status == "Horas a Serem Deferidas",
+                func.lower(BancoDeHoras.status).like("%espera%"),
+                func.lower(BancoDeHoras.status).like("%aguard%"),
+                func.lower(BancoDeHoras.status).like("%pendent%"),
+                func.lower(BancoDeHoras.status).like("%anal%"),
+            )
+        )
+        .filter(func.upper(func.coalesce(BancoDeHoras.motivo, "")) != "BH")
+        .scalar()
+        or 0
     )
 
     debitos_min = (
-        db.session.query(
-            func.coalesce(func.sum(Agendamento.horas * 60 + Agendamento.minutos), 0)
-        )
+        db.session.query(func.coalesce(func.sum(_agendamento_bh_minutos_expr()), 0))
         .filter(Agendamento.funcionario_id == funcionario_id)
         .filter(func.lower(Agendamento.status).like("deferid%"))
-        .filter(func.lower(Agendamento.motivo) == "bh")
+        .filter(
+            or_(
+                func.upper(func.coalesce(Agendamento.motivo, "")) == "BH",
+                func.upper(func.coalesce(Agendamento.tipo_folga, "")) == "BH",
+            )
+        )
         .scalar()
+        or 0
     )
 
-    saldo = int(creditos_min) - int(debitos_min)
+    creditos_min = int(creditos_min)
+    pendentes_min = int(pendentes_min)
+    debitos_min = int(debitos_min)
+    saldo_calculado_min = creditos_min - debitos_min
+
+    # Regra conservadora: nao mostrar nem permitir uso acima do menor saldo conhecido.
+    saldo_disponivel_min = max(0, min(saldo_salvo_min, saldo_calculado_min))
+
+    horas_deferidas, minutos_deferidos = _split_minutos_positivos(creditos_min)
+    horas_em_espera, minutos_em_espera = _split_minutos_positivos(pendentes_min)
+    horas_usufruidas, minutos_usufruidos = _split_minutos_positivos(debitos_min)
+    horas_a_usufruir, minutos_a_usufruir = _split_minutos_positivos(
+        saldo_disponivel_min
+    )
+
+    return {
+        "creditos_min": creditos_min,
+        "pendentes_min": pendentes_min,
+        "debitos_min": debitos_min,
+        "saldo_salvo_min": saldo_salvo_min,
+        "saldo_calculado_min": saldo_calculado_min,
+        "saldo_disponivel_min": saldo_disponivel_min,
+        "saldo_divergente": saldo_salvo_min != saldo_calculado_min,
+        "horas_deferidas": horas_deferidas,
+        "minutos_deferidos": minutos_deferidos,
+        "horas_em_espera": horas_em_espera,
+        "minutos_em_espera": minutos_em_espera,
+        "horas_usufruidas": horas_usufruidas,
+        "minutos_usufruidos": minutos_usufruidos,
+        "horas_a_usufruir": horas_a_usufruir,
+        "minutos_a_usufruir": minutos_a_usufruir,
+    }
+
+
+# ===========================================
+# CONSULTAR HORAS (USUÁRIO)
+# ===========================================
+@app.route("/consultar_horas")
+@login_required
+def consultar_horas():
+    registros = (
+        BancoDeHoras.query.filter_by(funcionario_id=current_user.id)
+        .order_by(BancoDeHoras.data_realizacao.desc())
+        .all()
+    )
+    resumo_bh = _calcular_bh_usuario(current_user.id, current_user)
+
+    return render_template(
+        "consultar_horas.html",
+        registros=registros,
+        **resumo_bh,
+    )
+
+
+# ============================
+# INSERIR BANCO DE HORAS (ADMIN)
+# ============================
+import datetime as dt
+
+
+def _recalcular_saldo_minutos(funcionario_id: int):
+    saldo = int(_calcular_bh_usuario(funcionario_id)["saldo_calculado_min"])
     u = User.query.get(funcionario_id)
     if u:
         u.banco_horas = saldo
@@ -7317,7 +7373,11 @@ def deferir_horas():
 
             # Após commit, calcula dados atuais para o e-mail (saldo e pendências)
             try:
-                saldo_atual_min = int(funcionario.banco_horas or 0)
+                saldo_atual_min = int(
+                    _calcular_bh_usuario(funcionario.id, funcionario)[
+                        "saldo_disponivel_min"
+                    ]
+                )
 
                 pendentes_min = (
                     db.session.query(
