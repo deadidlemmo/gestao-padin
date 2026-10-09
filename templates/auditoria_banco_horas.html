@@ -43,7 +43,7 @@
 
     .audit-shell {
       width: 100%;
-      max-width: 1240px;
+      max-width: min(1380px, calc(100vw - 28px));
       margin: 0 auto;
     }
 
@@ -189,7 +189,7 @@
 
     .filters-form {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) 260px auto auto;
+      grid-template-columns: minmax(260px, 1fr) 260px auto auto;
       gap: 12px;
       align-items: end;
     }
@@ -283,20 +283,21 @@
     .table-scroll {
       width: 100%;
       overflow-x: auto;
+      scrollbar-gutter: stable;
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 1120px;
+      min-width: 1160px;
     }
 
     th, td {
-      padding: 11px 12px;
+      padding: 11px 10px;
       border-bottom: 1px solid #e2e8f0;
       vertical-align: middle;
       text-align: left;
-      font-size: .83rem;
+      font-size: .81rem;
     }
 
     th {
@@ -314,7 +315,8 @@
     }
 
     .server-cell {
-      min-width: 260px;
+      min-width: 230px;
+      max-width: 280px;
     }
 
     .server-name {
@@ -340,6 +342,11 @@
       color: #111827;
     }
 
+    .status-cell {
+      min-width: 270px;
+      max-width: 310px;
+    }
+
     .muted {
       color: var(--muted);
       font-weight: 800;
@@ -361,7 +368,8 @@
       padding: 6px 9px;
       font-size: .75rem;
       font-weight: 900;
-      white-space: nowrap;
+      white-space: normal;
+      line-height: 1.15;
     }
 
     .status-success {
@@ -391,7 +399,27 @@
       font-size: .74rem;
       font-weight: 700;
       line-height: 1.25;
-      max-width: 230px;
+      max-width: none;
+    }
+
+    .audit-note {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      margin: 0 0 14px;
+      padding: 11px 12px;
+      border-radius: 10px;
+      border: 1px solid #bfdbfe;
+      background: #eff6ff;
+      color: #1e3a8a;
+      font-size: .82rem;
+      font-weight: 750;
+      line-height: 1.35;
+    }
+
+    .audit-note i {
+      margin-top: 2px;
+      color: var(--primary);
     }
 
     .empty-state {
@@ -472,7 +500,7 @@
         <div>
           <h1 class="heading-title">Auditoria de Banco de Horas</h1>
           <p class="heading-subtitle">
-            Conferência entre cache salvo, créditos deferidos, horas usufruídas e saldo real usado no agendamento.
+            Conferência entre saldo registrado, créditos deferidos, horas usufruídas e saldo real usado no agendamento.
           </p>
         </div>
       </div>
@@ -492,6 +520,14 @@
       </div>
     </div>
 
+    <p class="audit-note">
+      <i class="fas fa-info-circle" aria-hidden="true"></i>
+      <span>
+        O sistema usa o <strong>saldo real liberado</strong> para permitir novas folgas de Banco de Horas.
+        A coluna <strong>saldo registrado</strong> serve apenas para identificar registros antigos que ainda precisam ser conferidos.
+      </span>
+    </p>
+
     <div class="metrics-grid" aria-label="Resumo da auditoria">
       <div class="metric">
         <div class="metric-label"><i class="fas fa-users"></i> Consultados</div>
@@ -506,7 +542,7 @@
       <div class="metric">
         <div class="metric-label"><i class="fas fa-shield-alt"></i> Saldo Real</div>
         <div class="metric-value">{{ totais.saldo_seguro_total }}</div>
-        <div class="metric-note">Soma do saldo calculado que o sistema permite usar.</div>
+        <div class="metric-note">Soma do saldo liberado que o sistema permite usar.</div>
       </div>
       <div class="metric">
         <div class="metric-label"><i class="fas fa-not-equal"></i> Diferença Total</div>
@@ -557,9 +593,9 @@
                 <th>Créditos Deferidos</th>
                 <th>Usufruído</th>
                 <th>Pendente</th>
-                <th>Cache Salvo</th>
-                <th>Saldo Calculado</th>
-                <th>Saldo Real Usado</th>
+                <th>Saldo Registrado</th>
+                <th>Saldo Apurado</th>
+                <th>Saldo Liberado</th>
                 <th>Diferença</th>
                 <th>Situação</th>
               </tr>
@@ -586,7 +622,7 @@
                   <td class="number-cell {% if linha.diferenca_min > 0 %}diff-pos{% elif linha.diferenca_min < 0 %}diff-neg{% endif %}">
                     {{ linha.diferenca }}
                   </td>
-                  <td>
+                  <td class="status-cell">
                     <span class="status-pill {{ cls }}">
                       {% if linha.classificacao.tone == 'success' %}
                         <i class="fas fa-check"></i>

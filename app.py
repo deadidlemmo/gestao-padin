@@ -7046,22 +7046,22 @@ def _classificar_auditoria_bh(resumo_bh):
     if diferenca > 0:
         return {
             "key": "saldo_salvo_maior",
-            "label": "Cache salvo maior",
+            "label": "Registrado maior",
             "tone": "warning",
-            "detail": "O cache salvo no usuário é maior que o saldo real calculado.",
+            "detail": "O saldo registrado está acima do saldo real. O sistema já usa o saldo real.",
         }
     if diferenca < 0:
         return {
             "key": "saldo_salvo_menor",
-            "label": "Cache salvo menor",
+            "label": "Registrado menor",
             "tone": "info",
-            "detail": "O cache salvo no usuário é menor que o saldo real calculado.",
+            "detail": "O saldo registrado está abaixo do saldo real. O sistema já usa o saldo real.",
         }
     return {
         "key": "ok",
         "label": "OK",
         "tone": "success",
-        "detail": "Cache salvo e saldo real conferem.",
+        "detail": "Saldo registrado e saldo real conferem.",
     }
 
 
@@ -7177,8 +7177,8 @@ def auditoria_banco_horas():
     filtros = [
         ("divergentes", "Divergentes"),
         ("todos", "Todos"),
-        ("saldo_salvo_maior", "Cache salvo maior"),
-        ("saldo_salvo_menor", "Cache salvo menor"),
+        ("saldo_salvo_maior", "Registrado maior"),
+        ("saldo_salvo_menor", "Registrado menor"),
         ("calculado_negativo", "Uso maior que créditos"),
         ("ok", "OK"),
     ]
